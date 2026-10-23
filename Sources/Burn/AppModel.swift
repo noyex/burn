@@ -138,7 +138,8 @@ final class AppModel {
                 guard p.total > 0 else { return }
                 let pct = p.done * 100 / p.total
                 Task { @MainActor in
-                    if self?.importPercent != pct { self?.importPercent = pct }
+                    // Hops can land after sync() finished; ignore them then.
+                    if let self, self.syncing, self.importPercent != pct { self.importPercent = pct }
                 }
             }
             lastSync = .now
