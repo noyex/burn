@@ -2,6 +2,17 @@ import Foundation
 import Observation
 import ServiceManagement
 
+enum PopoverTab: String, CaseIterable {
+    case usage, shelf
+
+    var title: String {
+        switch self {
+        case .usage: "Usage"
+        case .shelf: "Shelf"
+        }
+    }
+}
+
 /// User preferences, persisted in UserDefaults.
 @MainActor
 @Observable
@@ -13,10 +24,21 @@ final class Settings {
     private var windows: [String: String]
     private(set) var launchAtLogin: Bool
 
+    var tab: PopoverTab {
+        didSet { defaults.set(tab.rawValue, forKey: "popover.tab") }
+    }
+
+    /// Shelf shown in the wide popover with more screenshots per row.
+    var shelfExpanded: Bool {
+        didSet { defaults.set(shelfExpanded, forKey: "shelf.expanded") }
+    }
+
     init() {
         hidden = Set(defaults.stringArray(forKey: "menuBar.hidden") ?? [])
         windows = defaults.dictionary(forKey: "menuBar.windows") as? [String: String] ?? [:]
         launchAtLogin = SMAppService.mainApp.status == .enabled
+        tab = defaults.string(forKey: "popover.tab").flatMap(PopoverTab.init) ?? .usage
+        shelfExpanded = defaults.bool(forKey: "shelf.expanded")
     }
 
     func showsInMenuBar(_ p: ProviderID) -> Bool { !hidden.contains(p.rawValue) }

@@ -4,6 +4,13 @@ import SwiftUI
 struct PopoverView: View {
     let model: AppModel
     @State private var showingSettings = false
+    @State private var selection: Set<URL> = []
+    @State private var confirmingClear = false
+    @State private var copiedSelection = false
+
+    private static let padding: CGFloat = 14
+    private var expanded: Bool { !showingSettings && model.settings.tab == .shelf && model.settings.shelfExpanded }
+    private var width: CGFloat { expanded ? 660 : 320 }
 
     var body: some View {
         Group {
@@ -13,11 +20,46 @@ struct PopoverView: View {
                 main
             }
         }
-        .padding(14)
-        .frame(width: 320)
+        .padding(Self.padding)
+        .frame(width: width)
     }
 
     private var main: some View {
+        @Bindable var settings = model.settings
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                GlassSegmented(options: PopoverTab.allCases, selection: $settings.tab) { $0.title }
+                if settings.tab == .shelf { expandButton }
+            }
+            switch settings.tab {
+            case .usage: usage
+            case .shelf:
+                ShelfView(shelf: model.shelf, width: width - Self.padding * 2,
+                          columns: expanded ? 4 : 2, maxHeight: expanded ? 560 : 380,
+                          selection: $selection)
+            }
+            footer.padding(.top, -2)
+        }
+    }
+
+    private var expandButton: some View {
+        Button {
+            model.settings.shelfExpanded.toggle()
+        } label: {
+            Image(systemName: model.settings.shelfExpanded
+                  ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 30, height: 30)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .glass(in: Circle(), interactive: true)
+        .help(model.settings.shelfExpanded ? "Smaller" : "Bigger")
+        .accessibilityLabel(model.settings.shelfExpanded ? "Make shelf smaller" : "Make shelf bigger")
+    }
+
+    private var usage: some View {
         VStack(alignment: .leading, spacing: 0) {
             if model.connected.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
@@ -49,7 +91,6 @@ struct PopoverView: View {
                 }
                 .controlSize(.small)
             }
-            footer.padding(.top, 10)
         }
     }
 
@@ -59,14 +100,11 @@ struct PopoverView: View {
     }
 
     private var footer: some View {
-        HStack {
-            TimelineView(.periodic(from: .now, by: 30)) { ctx in
-                Text(model.syncing ? "Syncing…" : Format.synced(model.lastSync, now: ctx.date))
-                    .opacity(model.hasUsage ? 1 : 0)
+        HStack(spacing: 10) {
+            switch model.settings.tab {
+            case .usage: syncStatus
+            case .shelf: shelfActions
             }
-            .font(.caption)
-            .foregroundStyle(.tertiary)
-            Spacer()
             Button { showingSettings = true } label: {
                 Image(systemName: "gearshape")
                     .frame(width: 24, height: 24)
@@ -76,6 +114,65 @@ struct PopoverView: View {
             .foregroundStyle(.secondary)
             .help("Settings")
             .accessibilityLabel("Settings")
+        }
+        .font(.caption)
+    }
+
+    private var syncStatus: some View {
+        HStack {
+            TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                Text(model.syncing ? "Syncing…" : Format.synced(model.lastSync, now: ctx.date))
+                    .opacity(model.hasUsage ? 1 : 0)
+            }
+            .foregroundStyle(.tertiary)
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var shelfActions: some View {
+        let items = model.shelf.items
+        let selected = items.filter { selection.contains($0.id) }
+        if selected.isEmpty {
+            Text(items.isEmpty ? "" : items.count == 1 ? "1 screenshot" : "\(items.count) screenshots")
+                .foregroundStyle(.tertiary)
+            Spacer()
+            if !items.isEmpty {
+                Button(confirmingClear ? "Clear all?" : "Clear") {
+                    if confirmingClear {
+                        confirmingClear = false
+                        withAnimation(.snappy) { model.shelf.clear() }
+                    } else {
+                        confirmingClear = true
+                        Task {
+                            try? await Task.sleep(for: .seconds(3))
+                            confirmingClear = false
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(confirmingClear ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+            }
+        } else {
+            Text("\(selected.count) selected").foregroundStyle(.secondary)
+            Spacer()
+            Button("Deselect") { selection = [] }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            Button {
+                model.shelf.copy(selected)
+                copiedSelection = true
+                Task {
+                    try? await Task.sleep(for: .seconds(1.2))
+                    copiedSelection = false
+                }
+            } label: {
+                Text(copiedSelection ? "Copied" : "Copy \(selected.count)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(minWidth: 56)
+            }
+            .glassButton(prominent: true)
+            .controlSize(.small)
         }
     }
 }
