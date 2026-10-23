@@ -25,7 +25,7 @@ struct CommandChip: View {
             }
             .padding(.horizontal, 7)
             .frame(height: 22)
-            .background(.quinary, in: RoundedRectangle(cornerRadius: 5))
+            .glass(in: Capsule(), interactive: true)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

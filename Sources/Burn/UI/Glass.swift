@@ -21,10 +21,33 @@ extension View {
     }
 }
 
+/// Round glass button with an SF Symbol.
+struct GlassIconButton: View {
+    let systemName: String
+    let label: String
+    var size: CGFloat = 30
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: size * 0.38, weight: .semibold))
+                .frame(width: size, height: size)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .glass(in: Circle(), interactive: true)
+        .help(label)
+        .accessibilityLabel(label)
+    }
+}
+
 /// A segmented control whose selection slides between options on a glass track.
 struct GlassSegmented<Value: Hashable>: View {
     let options: [Value]
     @Binding var selection: Value
+    var accessibilityLabel = ""
     let label: (Value) -> String
 
     @Namespace private var namespace
@@ -55,5 +78,7 @@ struct GlassSegmented<Value: Hashable>: View {
         }
         .padding(3)
         .glass(in: Capsule())
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilityLabel)
     }
 }
