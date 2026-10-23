@@ -56,8 +56,8 @@ final class AppModel {
         shelf = ShelfStore(settings: settings)
     }
 
-    func start() {
-        shelf.start()
+    func start(capturingClipboard: Bool = true) {
+        shelf.start(capturing: capturingClipboard)
         Task { await refreshLimits() }
         Task { await loadUsage(); await sync() }
         schedule(every: 120) { [weak self] in await self?.refreshLimits() }

@@ -43,12 +43,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let model = AppModel()
-        if CommandLine.arguments.contains("--preview") {
+        let preview = CommandLine.arguments.contains("--preview")
+        if preview {
             previewWindow = Self.makePreviewWindow(model: model)
         } else {
             statusItem = StatusItemController(model: model)
         }
-        model.start()
+        // A preview next to the installed app would save every copied image twice.
+        model.start(capturingClipboard: !preview)
     }
 
     /// Development aid: the popover content in a plain off-screen window that stays open,

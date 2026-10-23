@@ -7,6 +7,7 @@ struct PopoverView: View {
     @State private var selection: Set<URL> = []
     @State private var confirmingClear = false
     @State private var copiedSelection = false
+    @State private var resetTasks: [String: Task<Void, Never>] = [:]
 
     private static let padding: CGFloat = 14
     private var expanded: Bool { !showingSettings && model.settings.tab == .shelf && model.settings.shelfExpanded }
@@ -39,6 +40,10 @@ struct PopoverView: View {
                           selection: $selection)
             }
             footer.padding(.top, -2)
+        }
+        .onChange(of: model.shelf.items) { _, items in
+            // Pruned or cleared screenshots must not stay selected.
+            selection.formIntersection(items.map(\.id))
         }
     }
 
@@ -117,8 +122,6 @@ struct PopoverView: View {
         let items = model.shelf.items
         let selected = items.filter { selection.contains($0.id) }
         if selected.isEmpty {
-            Text(items.isEmpty ? "" : items.count == 1 ? "1 screenshot" : "\(items.count) screenshots")
-                .foregroundStyle(.tertiary)
             Spacer()
             if !items.isEmpty {
                 Button(confirmingClear ? "Clear all?" : "Clear") {
@@ -127,10 +130,7 @@ struct PopoverView: View {
                         withAnimation(.snappy) { model.shelf.clear() }
                     } else {
                         confirmingClear = true
-                        Task {
-                            try? await Task.sleep(for: .seconds(3))
-                            confirmingClear = false
-                        }
+                        resetLater("clear", after: 3) { confirmingClear = false }
                     }
                 }
                 .foregroundStyle(confirmingClear ? AnyShapeStyle(.red) : AnyShapeStyle(.primary))
@@ -146,10 +146,7 @@ struct PopoverView: View {
             Button {
                 model.shelf.copy(selected)
                 copiedSelection = true
-                Task {
-                    try? await Task.sleep(for: .seconds(1.2))
-                    copiedSelection = false
-                }
+                resetLater("copied", after: 1.2) { copiedSelection = false }
             } label: {
                 Text(copiedSelection ? "Copied" : "Copy \(selected.count)")
                     .font(.system(size: 12, weight: .semibold))
@@ -157,6 +154,15 @@ struct PopoverView: View {
             }
             .glassButton(prominent: true)
             .controlSize(.small)
+        }
+    }
+
+    /// Runs `reset` after a delay, replacing a pending reset with the same key.
+    private func resetLater(_ key: String, after seconds: Double, _ reset: @escaping @MainActor () -> Void) {
+        resetTasks[key]?.cancel()
+        resetTasks[key] = Task {
+            try? await Task.sleep(for: .seconds(seconds))
+            if !Task.isCancelled { reset() }
         }
     }
 }

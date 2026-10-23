@@ -28,7 +28,10 @@ final class ShelfStore {
     @ObservationIgnored private let settings: Settings
     @ObservationIgnored private let pasteboard = NSPasteboard.general
     @ObservationIgnored private var changeCount: Int
-    @ObservationIgnored private var lastHash: String?
+    /// Hash of the newest capture, to skip copying the same image twice in a row.
+    @ObservationIgnored private var newest: (url: URL, hash: String)?
+    /// Captures run one after another so file names and the duplicate check never race.
+    @ObservationIgnored private var captureQueue: Task<Void, Never>?
     @ObservationIgnored private var timers: [Timer] = []
 
     init(settings: Settings) {
@@ -36,11 +39,12 @@ final class ShelfStore {
         changeCount = pasteboard.changeCount
     }
 
-    func start() {
+    /// `capturing: false` only shows what's saved, without watching the clipboard.
+    func start(capturing: Bool = true) {
         try? FileManager.default.createDirectory(at: Self.directory, withIntermediateDirectories: true)
         items = Self.loadItems()
         prune()
-        schedule(every: 0.5) { [weak self] in self?.poll() }
+        if capturing { schedule(every: 0.5) { [weak self] in self?.poll() } }
         schedule(every: 3600) { [weak self] in self?.prune() }
     }
 
@@ -95,21 +99,24 @@ final class ShelfStore {
         // Text, files and rich documents often carry an image rendition too; only take plain images.
         guard types.isDisjoint(with: Self.skippedTypes),
               let data = pasteboard.data(forType: .png) ?? pasteboard.data(forType: .tiff) else { return }
-        Task { await capture(data) }
+        captureQueue = Task { [previous = captureQueue] in
+            await previous?.value
+            await capture(data)
+        }
     }
 
     private func capture(_ data: Data) async {
         let date = Date.now
         let url = Self.fileURL(for: date)
         // Copying the same image twice in a row (e.g. from a chat) shouldn't add a duplicate.
-        let previous = items.isEmpty ? nil : lastHash
+        let previous = newest.flatMap { $0.url == items.first?.url ? $0.hash : nil }
         let saved = await Task.detached { () -> String? in
             let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
             guard hash != previous, let png = Self.pngData(data), (try? png.write(to: url)) != nil else { return nil }
             return hash
         }.value
         guard let hash = saved else { return }
-        lastHash = hash
+        newest = (url, hash)
         items.insert(ShelfItem(url: url, date: date), at: 0)
         prune()
     }

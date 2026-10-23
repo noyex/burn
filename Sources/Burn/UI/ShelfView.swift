@@ -22,7 +22,7 @@ struct ShelfView: View {
                 Text("Screenshots you copy show up here")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                Text("⇧⌘4")
+                Text("⌃⇧⌘4")
                     .font(.caption.monospaced())
                     .foregroundStyle(.tertiary)
             }
@@ -88,6 +88,7 @@ private struct ShelfTile: View {
     @State private var image: NSImage?
     @State private var hovering = false
     @State private var copied = false
+    @State private var copiedReset: Task<Void, Never>?
 
     private static let checkbox: CGFloat = 26
     private let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -181,8 +182,10 @@ private struct ShelfTile: View {
 
     private func flashCopied() {
         withAnimation(.snappy(duration: 0.2)) { copied = true }
-        Task {
+        copiedReset?.cancel()
+        copiedReset = Task {
             try? await Task.sleep(for: .seconds(1.1))
+            guard !Task.isCancelled else { return }
             withAnimation(.easeOut(duration: 0.25)) { copied = false }
         }
     }
