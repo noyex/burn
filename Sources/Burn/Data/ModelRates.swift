@@ -168,31 +168,66 @@ struct ModelRates: Sendable {
         return (overrides, aliases, canon)
     }
 
-    static func make(document: [String: Any]) -> ModelRates {
-        let table = parseTable(document)
+    /// A parsed rates file: the table plus a digest of the raw bytes (cheap, unlike re-serializing the document).
+    private struct FileEntry: Sendable {
+        let table: [String: ModelRate]
+        let digest: Data
+        let fetchedAtMs: Double
+    }
+
+    /// Parsed files, keyed by path and invalidated by (size, mtime), so repeated syncs don't re-parse a 2 MB JSON.
+    private final class FileCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var entries: [String: (stamp: String, entry: FileEntry)] = [:]
+        func get(_ path: String, _ stamp: String) -> FileEntry? {
+            lock.lock(); defer { lock.unlock() }
+            return entries[path].flatMap { $0.stamp == stamp ? $0.entry : nil }
+        }
+        func set(_ path: String, _ stamp: String, _ entry: FileEntry) {
+            lock.lock(); defer { lock.unlock() }
+            entries[path] = (stamp, entry)
+        }
+    }
+    private static let fileCache = FileCache()
+
+    /// `wrapped`: T3's file keeps the LiteLLM document under `document`; Burn's own cache is the bare document.
+    private static func parseEntry(_ data: Data, wrapped: Bool) -> FileEntry? {
+        guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let doc = wrapped ? root["document"] as? [String: Any] : root else { return nil }
+        return FileEntry(table: parseTable(doc), digest: Data(SHA256.hash(data: data)),
+                         fetchedAtMs: (root["fetchedAtMs"] as? NSNumber)?.doubleValue ?? 0)
+    }
+
+    private static func readEntry(_ path: String, wrapped: Bool) -> FileEntry? {
+        var st = stat()
+        guard stat(path, &st) == 0 else { return nil }
+        let stamp = "\(st.st_size)|\(st.st_mtimespec.tv_sec).\(st.st_mtimespec.tv_nsec)"
+        if let hit = fileCache.get(path, stamp) { return hit }
+        guard let data = FileManager.default.contents(atPath: path), let e = parseEntry(data, wrapped: wrapped) else { return nil }
+        fileCache.set(path, stamp, e)
+        return e
+    }
+
+    /// The hash covers the raw rates bytes plus T3's overrides / aliases.
+    private static func make(_ entry: FileEntry) -> ModelRates {
         let settings = readSettings()
         var hasher = SHA256()
-        if let canon = try? JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]) { hasher.update(data: canon) }
+        hasher.update(data: entry.digest)
         hasher.update(data: settings.raw)
         let hash = hasher.finalize().map { String(format: "%02x", $0) }.joined()
-        return ModelRates(table: table, overrides: settings.overrides, aliases: settings.aliases, hash: hash)
+        return ModelRates(table: entry.table, overrides: settings.overrides, aliases: settings.aliases, hash: hash)
     }
 
     // MARK: Loading
 
+    private static var t3Path: String { NSHomeDirectory() + "/.t3/userdata/usage-model-rates.json" }
+
     /// T3's rates copy, then fresh Burn cache, then network, then whatever stale copy exists, then nothing.
     static func load() async -> ModelRates {
         let fm = FileManager.default
-        let t3Path = NSHomeDirectory() + "/.t3/userdata/usage-model-rates.json"
         var t3: (rates: ModelRates, age: TimeInterval)?
-        if let data = fm.contents(atPath: t3Path),
-           let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let doc = root["document"] as? [String: Any] {
-            let r = make(document: doc)
-            if !r.table.isEmpty {
-                let fetched = (root["fetchedAtMs"] as? NSNumber)?.doubleValue ?? 0
-                t3 = (r, Date().timeIntervalSince1970 - fetched / 1000)
-            }
+        if let e = readEntry(t3Path, wrapped: true), !e.table.isEmpty {
+            t3 = (make(e), Date().timeIntervalSince1970 - e.fetchedAtMs / 1000)
         }
         if let t3, t3.age < t3MaxAge { return t3.rates }
 
@@ -201,8 +236,8 @@ struct ModelRates: Sendable {
             .map { Date().timeIntervalSince($0) }
         if let age, age < 24 * 3600, let r = readCache(cache) { return r }
         if let (status, data) = try? await httpData(URLRequest(url: sourceURL)), status == 200,
-           let doc = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
-            let r = make(document: doc)
+           let e = parseEntry(data, wrapped: false) {
+            let r = make(e)
             if r.table.count > 100 {
                 try? fm.createDirectory(atPath: UsageStore.supportDir, withIntermediateDirectories: true)
                 try? data.write(to: URL(fileURLWithPath: cache), options: .atomic)
@@ -214,18 +249,12 @@ struct ModelRates: Sendable {
 
     /// Rates exactly as T3 has them on disk, regardless of age (verification).
     static func loadT3Only() -> ModelRates? {
-        let path = NSHomeDirectory() + "/.t3/userdata/usage-model-rates.json"
-        guard let data = FileManager.default.contents(atPath: path),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let doc = root["document"] as? [String: Any] else { return nil }
-        let r = make(document: doc)
-        return r.table.isEmpty ? nil : r
+        guard let e = readEntry(t3Path, wrapped: true), !e.table.isEmpty else { return nil }
+        return make(e)
     }
 
     private static func readCache(_ path: String) -> ModelRates? {
-        guard let data = FileManager.default.contents(atPath: path),
-              let doc = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
-        let r = make(document: doc)
-        return r.table.isEmpty ? nil : r
+        guard let e = readEntry(path, wrapped: false), !e.table.isEmpty else { return nil }
+        return make(e)
     }
 }

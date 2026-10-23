@@ -10,6 +10,14 @@ enum CodexTierResolver {
 
     static var dbPath: String { NSHomeDirectory() + "/.t3/userdata/statev2.sqlite" }
 
+    /// Size and mtime of T3's database; changes when T3 recorded anything new.
+    static func dbStamp() -> String {
+        [dbPath].map { p -> String in
+            var st = stat()
+            return stat(p, &st) == 0 ? "\(st.st_size).\(st.st_mtimespec.tv_sec).\(st.st_mtimespec.tv_nsec)" : "none"
+        }.joined(separator: "|")
+    }
+
     static func resolve(_ requests: [Request]) -> [Request: Speed] {
         guard !requests.isEmpty, FileManager.default.fileExists(atPath: dbPath) else { return [:] }
         var db: OpaquePointer?

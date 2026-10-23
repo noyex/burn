@@ -108,7 +108,12 @@ private func num(_ v: Any?) -> Double? {
     let d = n.doubleValue
     return d.isFinite ? d : nil
 }
-private func int(_ v: Any?) -> Int64 { num(v).map { Int64($0) } ?? 0 }
+/// Largest magnitude converted to an integer; anything beyond is treated as invalid (practically impossible in real
+/// logs, and `Int64(_:)` traps on out-of-range doubles).
+private let maxInteger = 1e15
+private func toInt64(_ d: Double) -> Int64? { abs(d) <= maxInteger ? Int64(d) : nil }
+private func toInt(_ d: Double) -> Int? { abs(d) <= maxInteger ? Int(d) : nil }
+private func int(_ v: Any?) -> Int64 { num(v).flatMap(toInt64) ?? 0 }
 private func str(_ v: Any?) -> String? { v as? String }
 private func timestamp(_ v: Any?) -> Int64? { (v as? String).flatMap(isoToMs) }
 
@@ -132,16 +137,16 @@ private func scanLines(_ data: Data, needles: [String], _ body: ([String: Any]) 
     }
 }
 
-private func mapped(_ path: String) throws -> Data {
-    try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
+private func readFile(_ path: String) throws -> Data {
+    try Data(contentsOf: URL(fileURLWithPath: path), options: [])
 }
 
 // MARK: - Claude
 
 /// T3's `tokenCount`: positive finite numbers, truncated.
 private func tokenCount(_ v: Any?) -> Int64 {
-    guard let d = num(v), d > 0 else { return 0 }
-    return Int64(d.rounded(.towardZero))
+    guard let d = num(v), d > 0, let n = toInt64(d.rounded(.towardZero)) else { return 0 }
+    return n
 }
 
 private func claudeRecord(_ d: [String: Any]) -> UsageRecord? {
@@ -163,7 +168,7 @@ private func claudeRecord(_ d: [String: Any]) -> UsageRecord? {
 /// Records of one Claude transcript, in file order, repeats of a `dedupeKey` dropped (first kept).
 func parseClaudeRecords(path: String) throws -> [UsageRecord] {
     var out: [UsageRecord] = []
-    scanLines(try mapped(path), needles: ["\"usage\""]) { d in
+    scanLines(try readFile(path), needles: ["\"usage\""]) { d in
         if let r = claudeRecord(d) { out.append(r) }
     }
     return dedupeWithinFile(out)
@@ -192,11 +197,11 @@ private struct CodexUsage: Equatable {
         guard let raw = value as? [String: Any] else { return nil }
         func field(_ k: String) -> Int64?? {
             guard let v = raw[k] else { return .some(nil) }       // missing -> default
-            guard let d = num(v), d >= 0, d == d.rounded() else { return nil }  // present but invalid
-            return .some(Int64(d))
+            guard let d = num(v), d >= 0, d == d.rounded(), let n = toInt64(d) else { return nil }  // present but invalid
+            return .some(n)
         }
         guard let i = num(raw["input_tokens"]), let o = num(raw["output_tokens"]),
-              i >= 0, o >= 0, i == i.rounded(), o == o.rounded(),
+              i >= 0, o >= 0, i == i.rounded(), o == o.rounded(), i <= maxInteger, o <= maxInteger,
               let c = field("cached_input_tokens"), let w = field("cache_write_input_tokens"),
               let r = field("reasoning_output_tokens"), let t = field("total_tokens") else { return nil }
         let u = CodexUsage(input: Int64(i), cached: c ?? 0, cacheWrite: w ?? 0, output: Int64(o), reasoning: r ?? 0,
@@ -318,7 +323,7 @@ private func codexRecord(_ rec: [String: Any], _ s: inout CodexScanState) -> Usa
 func parseCodexRecords(path: String) throws -> [UsageRecord] {
     var state = CodexScanState()
     var out: [UsageRecord] = []
-    scanLines(try mapped(path), needles: ["\"token_count\"", "\"turn_context\"", "\"thread_settings_applied\"", "\"session_meta\""]) { d in
+    scanLines(try readFile(path), needles: ["\"token_count\"", "\"turn_context\"", "\"thread_settings_applied\"", "\"session_meta\""]) { d in
         if let r = codexRecord(d, &state) { out.append(r) }
     }
     return out
@@ -369,7 +374,7 @@ func t3CacheVersion(_ name: String) -> Int {
 
 /// Decodes T3's usage-scan-cache*.json (`decodeScanCache`). Entries that fail validation are skipped, like T3 does.
 func parseT3Cache(path: String) throws -> [T3CacheFile] {
-    guard let d = try JSONSerialization.jsonObject(with: mapped(path)) as? [String: Any],
+    guard let d = try JSONSerialization.jsonObject(with: readFile(path)) as? [String: Any],
           let version = num(d["version"]), version >= 4, version <= 7,
           let models = d["models"] as? [String], let sessions = d["sessions"] as? [String],
           let files = d["files"] as? [String: Any] else { return [] }
@@ -378,12 +383,13 @@ func parseT3Cache(path: String) throws -> [T3CacheFile] {
         var out: [UsageRecord] = []
         for case let r as [Any] in rows {
             // [ts_ms, model, session, uncached, cached, cacheCreation, output, reasoning, dedupeKey, reportedCost, speed, rateModel, tierTurn?]
-            guard r.count >= 11, let ts = num(r[0]), let mi = num(r[1]).map(Int.init), mi >= 0, mi < models.count,
-                  let u = num(r[3]), let c = num(r[4]), let w = num(r[5]), let o = num(r[6]), let re = num(r[7]),
-                  let si = num(r[10]).map(Int.init), si >= 0, si < Speed.cacheOrder.count else { return nil }
+            guard r.count >= 11, let ts = num(r[0]).flatMap(toInt64), let mi = num(r[1]).flatMap(toInt), mi >= 0, mi < models.count,
+                  let u = num(r[3]).flatMap(toInt64), let c = num(r[4]).flatMap(toInt64), let w = num(r[5]).flatMap(toInt64),
+                  let o = num(r[6]).flatMap(toInt64), let re = num(r[7]).flatMap(toInt64),
+                  let si = num(r[10]).flatMap(toInt), si >= 0, si < Speed.cacheOrder.count else { return nil }
             var rateModel: String?
             if r.count > 11, !(r[11] is NSNull), r[11] as? NSNumber != nil {
-                guard let ri = num(r[11]).map(Int.init), ri >= 0, ri < models.count else { return nil }
+                guard let ri = num(r[11]).flatMap(toInt), ri >= 0, ri < models.count else { return nil }
                 rateModel = models[ri]
             }
             var tier: String?
@@ -393,11 +399,11 @@ func parseT3Cache(path: String) throws -> [T3CacheFile] {
             }
             let model = models[mi]
             if provider == "claude" && model == "<synthetic>" { continue }
-            let sess = num(r[2]).map(Int.init).flatMap { $0 >= 0 && $0 < sessions.count ? sessions[$0] : nil } ?? ""
+            let sess = num(r[2]).flatMap(toInt).flatMap { $0 >= 0 && $0 < sessions.count ? sessions[$0] : nil } ?? ""
             out.append(UsageRecord(
-                provider: provider, tsMs: Int64(ts), model: model, rateModel: rateModel, sessionId: sess,
+                provider: provider, tsMs: ts, model: model, rateModel: rateModel, sessionId: sess,
                 project: provider == "claude" ? URL(fileURLWithPath: src).deletingLastPathComponent().lastPathComponent : nil,
-                totals: TokenTotals(uncached: Int64(u), cached: Int64(c), cacheCreation: Int64(w), output: Int64(o), reasoning: Int64(re)),
+                totals: TokenTotals(uncached: u, cached: c, cacheCreation: w, output: o, reasoning: re),
                 reportedCost: num(r[9]), speed: Speed.cacheOrder[si],
                 dedupeKey: r[8] as? String, tierTurn: tier))
         }
@@ -412,7 +418,7 @@ func parseT3Cache(path: String) throws -> [T3CacheFile] {
               let rec = decode(r, provider, src), let tail = decode(t, provider, src) else { continue }
         // `records` and `tailRecords` are deduped with one shared set.
         let merged = provider == "claude" ? dedupeWithinFile(rec + tail) : rec + tail
-        out.append(T3CacheFile(path: src, provider: provider, size: Int64(num(entry["s"]) ?? -1), records: merged))
+        out.append(T3CacheFile(path: src, provider: provider, size: num(entry["s"]).flatMap(toInt64) ?? -1, records: merged))
     }
     return out.sorted { $0.path < $1.path }
 }

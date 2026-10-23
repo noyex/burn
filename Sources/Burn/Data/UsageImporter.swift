@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import SQLite3
 
@@ -30,8 +31,9 @@ actor UsageImporter {
     /// Keeps T3's "first occurrence wins" deterministic whatever order files finish parsing in.
     private static let upsert = "INSERT INTO usage (\(columns)) VALUES (\(placeholders)) ON CONFLICT(id) DO UPDATE SET "
         + UsageStore.columns.dropFirst().map { "\($0)=excluded.\($0)" }.joined(separator: ",")
-        + " WHERE excluded.origin < usage.origin OR (excluded.origin = usage.origin AND (excluded.source = usage.source"
-        + " OR excluded.ts_ms < usage.ts_ms OR (excluded.ts_ms = usage.ts_ms AND excluded.source < usage.source)))"
+        + " WHERE (" + UsageStore.columns.dropFirst().map { "excluded.\($0) IS NOT usage.\($0)" }.joined(separator: " OR ") + ")"
+        + " AND (excluded.origin < usage.origin OR (excluded.origin = usage.origin AND (excluded.source = usage.source"
+        + " OR excluded.ts_ms < usage.ts_ms OR (excluded.ts_ms = usage.ts_ms AND excluded.source < usage.source))))"
     private static let concurrency = 6
 
     func run(progress: @escaping @Sendable (ImportProgress) -> Void) async throws -> (parsedFiles: Int, newRows: Int, totalRows: Int) {
@@ -61,6 +63,7 @@ actor UsageImporter {
 
         // Logs: parsed concurrently, written serially. Raw logs are the source of truth, so a changed file replaces its rows.
         var parsedFiles = 0
+        do {
         try await withThrowingTaskGroup(of: Parsed.self) { group in
             var iterator = jobs.makeIterator()
             func spawn() {
@@ -91,8 +94,14 @@ actor UsageImporter {
         try batch.commit()
 
         // T3 caches, newest format first. They only contribute transcripts that are gone from disk (T3 does the same
-        // for retained history), and never override log rows. Cheap, so always re-read in full.
+        // for retained history), and never override log rows. Their rows depend only on the cache files and on which
+        // log paths exist, so nothing is re-read when neither changed and no log was (re)parsed.
         var covered = Set(all.map(\.path))
+        let cacheSig = Self.digest(caches.map { "\($0.path)|\($0.size)|\($0.mtime)" } + ["--"] + covered.sorted())
+        if jobs.isEmpty, try conn.scalarText("SELECT value FROM meta WHERE key='cache_sig'") == cacheSig {
+            done += caches.count
+            progress(ImportProgress(done: done, total: total))
+        } else {
         try conn.exec("BEGIN")
         for c in caches {
             if let files = try? parseT3Cache(path: c.path) {
@@ -109,7 +118,13 @@ actor UsageImporter {
             done += 1
             progress(ImportProgress(done: done, total: total))
         }
+        try conn.exec("INSERT OR REPLACE INTO meta VALUES ('cache_sig', '\(cacheSig)')")
         try conn.exec("COMMIT")
+        }
+        } catch {
+            try? conn.exec("ROLLBACK")   // no-op error when no transaction is open
+            throw error
+        }
 
         try resolveTiers(conn, rates)
         try reprice(conn, rates)
@@ -152,8 +167,18 @@ actor UsageImporter {
         }
         sqlite3_finalize(find)
         guard !pending.isEmpty else { return }
+        // Only ask T3 again when its database changed or the set of unresolved rows did.
+        func signature(_ rows: [Pending]) -> String {
+            Self.digest([CodexTierResolver.dbStamp()] + rows.map(\.id).sorted())
+        }
+        if try conn.scalarText("SELECT value FROM meta WHERE key='tier_sig'") == signature(pending) { return }
         let resolved = CodexTierResolver.resolve(Set(pending.map { CodexTierResolver.Request(session: $0.session, turn: $0.turn, model: $0.model) }).sorted { $0.turn < $1.turn })
-        guard !resolved.isEmpty else { return }
+        let remaining = pending.filter { resolved[CodexTierResolver.Request(session: $0.session, turn: $0.turn, model: $0.model)] == nil }
+        let sig = signature(remaining)
+        guard !resolved.isEmpty else {
+            try conn.exec("INSERT OR REPLACE INTO meta VALUES ('tier_sig', '\(sig)')")
+            return
+        }
         let update = try conn.prepare("UPDATE usage SET speed=?, tier_turn=NULL, cost_usd=? WHERE id=?")
         defer { sqlite3_finalize(update) }
         try conn.exec("BEGIN")
@@ -165,6 +190,7 @@ actor UsageImporter {
                 bindText(update, 1, speed.rawValue); sqlite3_bind_double(update, 2, cost); bindText(update, 3, p.id)
                 try conn.run(update)
             }
+            try conn.exec("INSERT OR REPLACE INTO meta VALUES ('tier_sig', '\(sig)')")
             try conn.exec("COMMIT")
         } catch {
             try? conn.exec("ROLLBACK")
@@ -175,8 +201,12 @@ actor UsageImporter {
     /// Recomputes every stored cost when the rate table (or T3's price overrides) changed since the last import.
     private func reprice(_ conn: SQLiteConnection, _ rates: ModelRates) throws {
         if try conn.scalarText("SELECT value FROM meta WHERE key='rates_hash'") == rates.hash { return }
-        // An unusable table (offline, no cache) must not zero out costs that were priced earlier.
-        if rates.table.isEmpty { return }
+        // An unusable table (offline, no cache) must not zero out costs that were priced earlier. Rows imported now
+        // are unpriced, so forget the stored hash: the next run with real rates re-prices everything.
+        if rates.table.isEmpty {
+            try conn.exec("DELETE FROM meta WHERE key='rates_hash'")
+            return
+        }
         let find = try conn.prepare("SELECT id, model, rate_model, speed, input, cache_read, cache_write, output, reported_cost, cost_usd FROM usage")
         let update = try conn.prepare("UPDATE usage SET cost_usd=? WHERE id=?")
         defer { sqlite3_finalize(update) }
@@ -206,6 +236,12 @@ actor UsageImporter {
     }
 
     // MARK: - Helpers
+
+    private static func digest(_ parts: [String]) -> String {
+        var h = SHA256()
+        for p in parts { h.update(data: Data(p.utf8)); h.update(data: Data([0])) }
+        return h.finalize().map { String(format: "%02x", $0) }.joined()
+    }
 
     private func knownFiles(_ conn: SQLiteConnection) throws -> [String: (Int64, Double)] {
         let s = try conn.prepare("SELECT path, size, mtime FROM files")

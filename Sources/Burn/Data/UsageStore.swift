@@ -68,7 +68,8 @@ final class SQLiteConnection {
         sqlite3_busy_timeout(h, 5000)
     }
 
-    deinit { sqlite3_close(db) }
+    /// `_v2`: statements finalized after the connection is released (ARC / `defer` order) must not leak the handle.
+    deinit { sqlite3_close_v2(db) }
 
     func exec(_ sql: String) throws {
         guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else { throw UsageDatabaseError.query(message) }
