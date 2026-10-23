@@ -25,12 +25,17 @@ struct SettingsView: View {
             }
 
             group {
-                Toggle("Launch at login", isOn: Binding(
-                    get: { model.settings.launchAtLogin },
-                    set: { model.settings.setLaunchAtLogin($0) }))
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .frame(height: 32)
+                HStack {
+                    Text("Launch at login")
+                    Spacer()
+                    Toggle("Launch at login", isOn: Binding(
+                        get: { model.settings.launchAtLogin },
+                        set: { model.settings.setLaunchAtLogin($0) }))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                }
+                .frame(height: 32)
             }
 
             Button("Quit Burn") { NSApp.terminate(nil) }
@@ -44,6 +49,7 @@ struct SettingsView: View {
     private func group(@ViewBuilder _ content: () -> some View) -> some View {
         VStack(spacing: 0) { content() }
             .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity)
             .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
     }
 
