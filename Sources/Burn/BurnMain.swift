@@ -14,6 +14,10 @@ enum BurnMain {
             RunLoop.main.run()
             return
         }
+        if CommandLine.arguments.contains("--verify-t3") {
+            runVerifyT3()
+            exit(0)
+        }
         if CommandLine.arguments.contains("--import") {
             Task {
                 await runDebugImport()

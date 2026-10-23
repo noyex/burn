@@ -9,9 +9,12 @@ enum UsageStore {
         ProcessInfo.processInfo.environment["BURN_DB"] ?? supportDir + "/usage.sqlite"
     }
 
+    /// Bump whenever parsing, ids or pricing semantics change: the importer drops and rebuilds `usage` and `files`.
+    static let schemaVersion = "2"
+
     static let schema = """
     CREATE TABLE IF NOT EXISTS usage (
-      id          TEXT PRIMARY KEY,   -- claude: msg_id:req_id, codex: codex:ts_ms:input:cache_read:output
+      id          TEXT PRIMARY KEY,   -- claude: msg_id:req_id; codex: session:ts:model:tokens#occurrence (T3's dedupe identity)
       provider    TEXT NOT NULL,      -- claude | codex
       model       TEXT,
       ts_ms       INTEGER NOT NULL,
@@ -24,13 +27,17 @@ enum UsageStore {
       cache_write INTEGER NOT NULL DEFAULT 0,
       output      INTEGER NOT NULL DEFAULT 0,
       reasoning   INTEGER NOT NULL DEFAULT 0,  -- informational, already part of output
-      fast        INTEGER NOT NULL DEFAULT 0,
+      speed       TEXT NOT NULL DEFAULT 'standard',  -- standard | fast | ultrafast
+      reported_cost REAL,             -- provider-reported cost (costUSD), wins over list price
+      rate_model  TEXT,               -- price this model instead of `model` (T3 scan cache)
+      tier_turn   TEXT,               -- codex turn whose service tier is still unresolved
       cost_usd    REAL NOT NULL DEFAULT 0,
-      origin      TEXT NOT NULL,      -- log | t3-cache | legacy
+      origin      TEXT NOT NULL,      -- log | t3-cache (sorts by precedence)
       source      TEXT
     );
     CREATE INDEX IF NOT EXISTS usage_day ON usage(day);
     CREATE INDEX IF NOT EXISTS usage_ts ON usage(ts_ms);
+    CREATE INDEX IF NOT EXISTS usage_source ON usage(source);
     CREATE TABLE IF NOT EXISTS files (path TEXT PRIMARY KEY, size INTEGER, mtime REAL);
     CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
     CREATE VIEW IF NOT EXISTS daily AS
@@ -42,7 +49,8 @@ enum UsageStore {
     """
 
     static let columns = ["id", "provider", "model", "ts_ms", "ts", "day", "session_id", "project", "input",
-                          "cache_read", "cache_write", "output", "reasoning", "fast", "cost_usd", "origin", "source"]
+                          "cache_read", "cache_write", "output", "reasoning", "speed", "reported_cost", "rate_model",
+                          "tier_turn", "cost_usd", "origin", "source"]
 }
 
 /// Thin read/write SQLite connection. Not thread safe; own it from a single isolation domain.

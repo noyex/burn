@@ -25,9 +25,13 @@ actor UsageImporter {
 
     private static let columns = UsageStore.columns.joined(separator: ",")
     private static let placeholders = UsageStore.columns.map { _ in "?" }.joined(separator: ",")
+    /// A row replaces an existing one with the same id only if it ranks better: log before T3 cache, then the
+    /// earliest timestamp, then the lowest source path; a re-import of the same source always overwrites.
+    /// Keeps T3's "first occurrence wins" deterministic whatever order files finish parsing in.
     private static let upsert = "INSERT INTO usage (\(columns)) VALUES (\(placeholders)) ON CONFLICT(id) DO UPDATE SET "
         + UsageStore.columns.dropFirst().map { "\($0)=excluded.\($0)" }.joined(separator: ",")
-    private static let insertIgnore = "INSERT OR IGNORE INTO usage (\(columns)) VALUES (\(placeholders))"
+        + " WHERE excluded.origin < usage.origin OR (excluded.origin = usage.origin AND (excluded.source = usage.source"
+        + " OR excluded.ts_ms < usage.ts_ms OR (excluded.ts_ms = usage.ts_ms AND excluded.source < usage.source)))"
     private static let concurrency = 6
 
     func run(progress: @escaping @Sendable (ImportProgress) -> Void) async throws -> (parsedFiles: Int, newRows: Int, totalRows: Int) {
@@ -36,36 +40,36 @@ actor UsageImporter {
         let conn = try SQLiteConnection(path: UsageStore.dbPath)
         _ = try conn.scalarText("PRAGMA journal_mode=WAL")
         try conn.exec("PRAGMA synchronous=NORMAL")
-        try conn.exec(UsageStore.schema)
+        try migrate(conn)
         let before = try conn.scalarInt("SELECT count(*) FROM usage")
-
-        try importLegacy(conn)
 
         let rates = await ModelRates.load()
         let known = try knownFiles(conn)
         let home = NSHomeDirectory()
-        let jobs = Self.jobs(in: home + "/.claude/projects", kind: .claude, known: known)
-            + Self.jobs(in: home + "/.codex/sessions", kind: .codex, known: known)
-        let caches = Self.t3Caches(in: home + "/.t3/userdata", known: known)
+        let all = Self.discover(home + "/.claude/projects", kind: .claude) + Self.discover(home + "/.codex/sessions", kind: .codex)
+        let jobs = all.filter { j in known[j.path].map { $0 != (j.size, j.mtime) } ?? true }
+        let caches = Self.t3Caches(in: home + "/.t3/userdata")
         let total = jobs.count + caches.count
         var done = 0
         progress(ImportProgress(done: 0, total: total))
 
         let upsertStmt = try conn.prepare(Self.upsert)
         let fileStmt = try conn.prepare("INSERT OR REPLACE INTO files VALUES (?,?,?)")
-        defer { sqlite3_finalize(upsertStmt); sqlite3_finalize(fileStmt) }
+        let clearStmt = try conn.prepare("DELETE FROM usage WHERE source = ? AND origin = 'log'")
+        defer { sqlite3_finalize(upsertStmt); sqlite3_finalize(fileStmt); sqlite3_finalize(clearStmt) }
         let batch = Batch(conn)
 
-        // Logs: parsed concurrently, written serially. Raw logs are the source of truth, so they overwrite.
+        // Logs: parsed concurrently, written serially. Raw logs are the source of truth, so a changed file replaces its rows.
         var parsedFiles = 0
         try await withThrowingTaskGroup(of: Parsed.self) { group in
             var iterator = jobs.makeIterator()
             func spawn() {
                 guard let job = iterator.next() else { return }
                 group.addTask {
-                    let rows = job.kind == .claude ? try? parseClaude(path: job.path, rates: rates)
-                                                   : try? parseCodex(path: job.path, rates: rates)
-                    return Parsed(job: job, rows: rows)
+                    let records = job.kind == .claude ? try? parseClaudeRecords(path: job.path)
+                                                      : try? parseCodexRecords(path: job.path)
+                    let project = job.kind == .claude ? URL(fileURLWithPath: job.path).deletingLastPathComponent().lastPathComponent : nil
+                    return Parsed(job: job, rows: records.map { makeRows($0, path: job.path, origin: "log", project: project, rates: rates) })
                 }
             }
             for _ in 0..<Self.concurrency { spawn() }
@@ -74,6 +78,8 @@ actor UsageImporter {
                 done += 1
                 if let rows = r.rows {
                     try batch.open()
+                    bindText(clearStmt, 1, r.job.path)
+                    try conn.run(clearStmt)
                     for row in rows { try Self.bind(upsertStmt, row); try conn.run(upsertStmt) }
                     try Self.recordFile(fileStmt, r.job.path, r.job.size, r.job.mtime, conn)
                     parsedFiles += 1
@@ -84,21 +90,28 @@ actor UsageImporter {
         }
         try batch.commit()
 
-        // T3 caches, oldest first, never overwriting existing rows.
-        let insertStmt = try conn.prepare(Self.insertIgnore)
-        defer { sqlite3_finalize(insertStmt) }
+        // T3 caches, newest format first. They only contribute transcripts that are gone from disk (T3 does the same
+        // for retained history), and never override log rows. Cheap, so always re-read in full.
+        var covered = Set(all.map(\.path))
+        try conn.exec("BEGIN")
         for c in caches {
-            if let rows = try? parseT3Cache(path: c.path, rates: rates) {
-                try conn.exec("BEGIN")
-                for row in rows { try Self.bind(insertStmt, row); try conn.run(insertStmt) }
-                try Self.recordFile(fileStmt, c.path, c.size, c.mtime, conn)
-                try conn.exec("COMMIT")
+            if let files = try? parseT3Cache(path: c.path) {
+                for f in files where !covered.contains(f.path) {
+                    let project = f.provider == "claude" ? URL(fileURLWithPath: f.path).deletingLastPathComponent().lastPathComponent : nil
+                    for row in makeRows(f.records, path: f.path, origin: "t3-cache", project: project, rates: rates) {
+                        try Self.bind(upsertStmt, row); try conn.run(upsertStmt)
+                    }
+                }
+                // A path seen in a newer cache is not taken again from an older one.
+                covered.formUnion(files.map(\.path))
                 parsedFiles += 1
             }
             done += 1
             progress(ImportProgress(done: done, total: total))
         }
+        try conn.exec("COMMIT")
 
+        try resolveTiers(conn, rates)
         try reprice(conn, rates)
         let after = try conn.scalarInt("SELECT count(*) FROM usage")
         _ = try? conn.scalarText("PRAGMA wal_checkpoint(PASSIVE)")
@@ -107,23 +120,51 @@ actor UsageImporter {
 
     // MARK: - Steps
 
-    /// One-time import of the old Python importer's database (`~/.t3-usage`), so history from deleted logs survives.
-    private func importLegacy(_ conn: SQLiteConnection) throws {
-        let legacy = NSHomeDirectory() + "/.t3-usage/usage.sqlite"
-        guard ProcessInfo.processInfo.environment["BURN_SKIP_LEGACY"] == nil,
-              try conn.scalarText("SELECT value FROM meta WHERE key='legacy_imported'") == nil,
-              FileManager.default.fileExists(atPath: legacy) else { return }
-        var url = URLComponents()
-        url.scheme = "file"; url.path = legacy; url.queryItems = [URLQueryItem(name: "mode", value: "ro")]
-        guard let uri = url.string else { return }
-        let escaped = uri.replacingOccurrences(of: "'", with: "''")
-        try conn.exec("ATTACH DATABASE '\(escaped)' AS legacy")
-        defer { try? conn.exec("DETACH DATABASE legacy") }
-        let cols = UsageStore.columns.joined(separator: ",")
+    /// Drops everything derived from logs when the parsing / pricing semantics changed (old rows were computed
+    /// differently, and the old Python importer's database is deliberately not imported).
+    private func migrate(_ conn: SQLiteConnection) throws {
+        try conn.exec("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+        if try conn.scalarText("SELECT value FROM meta WHERE key='schema_version'") != UsageStore.schemaVersion {
+            try conn.exec("BEGIN")
+            do {
+                try conn.exec("DROP VIEW IF EXISTS daily; DROP TABLE IF EXISTS usage; DROP TABLE IF EXISTS files; DELETE FROM meta")
+                try conn.exec(UsageStore.schema)
+                try conn.exec("INSERT INTO meta VALUES ('schema_version', '\(UsageStore.schemaVersion)')")
+                try conn.exec("COMMIT")
+            } catch {
+                try? conn.exec("ROLLBACK")
+                throw error
+            }
+        }
+        try conn.exec(UsageStore.schema)
+    }
+
+    /// Fills in the speed of Codex turns that carry no `thread_settings_applied`, from T3's database.
+    private func resolveTiers(_ conn: SQLiteConnection, _ rates: ModelRates) throws {
+        let find = try conn.prepare("SELECT id, session_id, tier_turn, model, rate_model, input, cache_read, cache_write, output, reported_cost FROM usage WHERE tier_turn IS NOT NULL AND session_id IS NOT NULL")
+        struct Pending { let id, session, turn, model: String; let rateModel: String?; let t: [Int64]; let reported: Double? }
+        var pending: [Pending] = []
+        while sqlite3_step(find) == SQLITE_ROW {
+            func t(_ i: Int32) -> String? { sqlite3_column_text(find, i).map { String(cString: $0) } }
+            pending.append(Pending(id: t(0)!, session: t(1)!, turn: t(2)!, model: t(3) ?? "", rateModel: t(4),
+                                   t: (5...8).map { sqlite3_column_int64(find, Int32($0)) },
+                                   reported: sqlite3_column_type(find, 9) == SQLITE_NULL ? nil : sqlite3_column_double(find, 9)))
+        }
+        sqlite3_finalize(find)
+        guard !pending.isEmpty else { return }
+        let resolved = CodexTierResolver.resolve(Set(pending.map { CodexTierResolver.Request(session: $0.session, turn: $0.turn, model: $0.model) }).sorted { $0.turn < $1.turn })
+        guard !resolved.isEmpty else { return }
+        let update = try conn.prepare("UPDATE usage SET speed=?, tier_turn=NULL, cost_usd=? WHERE id=?")
+        defer { sqlite3_finalize(update) }
         try conn.exec("BEGIN")
         do {
-            try conn.exec("INSERT OR IGNORE INTO usage (\(cols)) SELECT \(cols) FROM legacy.usage")
-            try conn.exec("INSERT OR REPLACE INTO meta VALUES ('legacy_imported', '1')")
+            for p in pending {
+                guard let speed = resolved[CodexTierResolver.Request(session: p.session, turn: p.turn, model: p.model)] else { continue }
+                let cost = rates.cost(model: p.model, rateModel: p.rateModel, speed: speed, uncached: p.t[0], cached: p.t[1],
+                                      cacheCreation: p.t[2], output: p.t[3], reported: p.reported)
+                bindText(update, 1, speed.rawValue); sqlite3_bind_double(update, 2, cost); bindText(update, 3, p.id)
+                try conn.run(update)
+            }
             try conn.exec("COMMIT")
         } catch {
             try? conn.exec("ROLLBACK")
@@ -131,28 +172,32 @@ actor UsageImporter {
         }
     }
 
-    /// Recomputes cost for rows imported before their model had a known rate.
+    /// Recomputes every stored cost when the rate table (or T3's price overrides) changed since the last import.
     private func reprice(_ conn: SQLiteConnection, _ rates: ModelRates) throws {
-        let find = try conn.prepare("SELECT DISTINCT model FROM usage WHERE cost_usd = 0 AND model IS NOT NULL")
-        var models: [String] = []
-        while sqlite3_step(find) == SQLITE_ROW, let c = sqlite3_column_text(find, 0) { models.append(String(cString: c)) }
+        if try conn.scalarText("SELECT value FROM meta WHERE key='rates_hash'") == rates.hash { return }
+        // An unusable table (offline, no cache) must not zero out costs that were priced earlier.
+        if rates.table.isEmpty { return }
+        let find = try conn.prepare("SELECT id, model, rate_model, speed, input, cache_read, cache_write, output, reported_cost, cost_usd FROM usage")
+        let update = try conn.prepare("UPDATE usage SET cost_usd=? WHERE id=?")
+        defer { sqlite3_finalize(update) }
+        var changes: [(String, Double)] = []
+        while sqlite3_step(find) == SQLITE_ROW {
+            func t(_ i: Int32) -> String? { sqlite3_column_text(find, i).map { String(cString: $0) } }
+            let cost = rates.cost(
+                model: t(1) ?? "", rateModel: t(2), speed: Speed(rawValue: t(3) ?? "") ?? .standard,
+                uncached: sqlite3_column_int64(find, 4), cached: sqlite3_column_int64(find, 5),
+                cacheCreation: sqlite3_column_int64(find, 6), output: sqlite3_column_int64(find, 7),
+                reported: sqlite3_column_type(find, 8) == SQLITE_NULL ? nil : sqlite3_column_double(find, 8))
+            if cost != sqlite3_column_double(find, 9) { changes.append((t(0)!, cost)) }
+        }
         sqlite3_finalize(find)
-        let priced = models.compactMap { m in rates.rate(for: m).map { (m, $0) } }
-        guard !priced.isEmpty else { return }
-        let expr = "cost_usd = input*? + cache_read*? + cache_write*? + output*?"
-        let normal = try conn.prepare("UPDATE usage SET \(expr) WHERE model=? AND cost_usd=0 AND NOT (fast=1 AND provider='codex')")
-        let priority = try conn.prepare("UPDATE usage SET \(expr) WHERE model=? AND cost_usd=0 AND fast=1 AND provider='codex'")
-        defer { sqlite3_finalize(normal); sqlite3_finalize(priority) }
         try conn.exec("BEGIN")
         do {
-            for (m, r) in priced {
-                for (stmt, v) in [(normal, [r.input, r.cacheRead, r.cacheWrite, r.output]),
-                                  (priority, [r.inputP, r.cacheReadP, r.cacheWriteP, r.outputP])] {
-                    for (i, x) in v.enumerated() { sqlite3_bind_double(stmt, Int32(i + 1), x) }
-                    bindText(stmt, 5, m)
-                    try conn.run(stmt)
-                }
+            for (id, cost) in changes {
+                sqlite3_bind_double(update, 1, cost); bindText(update, 2, id)
+                try conn.run(update)
             }
+            try conn.exec("INSERT OR REPLACE INTO meta VALUES ('rates_hash', '\(rates.hash)')")
             try conn.exec("COMMIT")
         } catch {
             try? conn.exec("ROLLBACK")
@@ -178,27 +223,26 @@ actor UsageImporter {
         return (Int64(st.st_size), Double(st.st_mtimespec.tv_sec) + Double(st.st_mtimespec.tv_nsec) / 1e9)
     }
 
-    /// Changed `*.jsonl` files below `root` (hidden directories skipped, like a shell glob).
-    private static func jobs(in root: String, kind: Job.Kind, known: [String: (Int64, Double)]) -> [Job] {
-        guard let e = FileManager.default.enumerator(at: URL(fileURLWithPath: root), includingPropertiesForKeys: nil,
-                                                     options: [.skipsHiddenFiles]) else { return [] }
+    /// Every `*.jsonl` below `root`, hidden directories included (T3 walks them too).
+    private static func discover(_ root: String, kind: Job.Kind) -> [Job] {
+        guard let e = FileManager.default.enumerator(at: URL(fileURLWithPath: root), includingPropertiesForKeys: nil) else { return [] }
         var out: [Job] = []
         for case let url as URL in e where url.pathExtension == "jsonl" {
-            guard let (size, mtime) = fileStat(url.path), known[url.path].map({ $0 != (size, mtime) }) ?? true else { continue }
+            guard let (size, mtime) = fileStat(url.path) else { continue }
             out.append(Job(path: url.path, size: size, mtime: mtime, kind: kind))
         }
         return out
     }
 
-    private static func t3Caches(in dir: String, known: [String: (Int64, Double)]) -> [Job] {
+    /// T3 scan caches, newest format first.
+    private static func t3Caches(in dir: String) -> [Job] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? []
         return names.filter { $0.hasPrefix("usage-scan-cache") && $0.hasSuffix(".json") }
+            .sorted { (t3CacheVersion($0), $0) > (t3CacheVersion($1), $1) }
             .compactMap { n -> Job? in
                 let p = dir + "/" + n
-                guard let (size, mtime) = fileStat(p), known[p].map({ $0 != (size, mtime) }) ?? true else { return nil }
-                return Job(path: p, size: size, mtime: mtime, kind: .claude)
+                return fileStat(p).map { Job(path: p, size: $0.0, mtime: $0.1, kind: .claude) }
             }
-            .sorted { $0.mtime < $1.mtime }
     }
 
     private static func recordFile(_ s: OpaquePointer, _ path: String, _ size: Int64, _ mtime: Double,
@@ -213,10 +257,12 @@ actor UsageImporter {
         bindText(s, 1, r.id); bindText(s, 2, r.provider); bindText(s, 3, r.model)
         sqlite3_bind_int64(s, 4, r.tsMs); bindText(s, 5, r.ts); bindText(s, 6, r.day)
         bindText(s, 7, r.session); bindText(s, 8, r.project)
-        sqlite3_bind_int64(s, 9, r.input); sqlite3_bind_int64(s, 10, r.cacheRead)
-        sqlite3_bind_int64(s, 11, r.cacheWrite); sqlite3_bind_int64(s, 12, r.output)
-        sqlite3_bind_int64(s, 13, r.reasoning); sqlite3_bind_int64(s, 14, r.fast ? 1 : 0)
-        sqlite3_bind_double(s, 15, r.cost); bindText(s, 16, r.origin); bindText(s, 17, r.source)
+        sqlite3_bind_int64(s, 9, r.totals.uncached); sqlite3_bind_int64(s, 10, r.totals.cached)
+        sqlite3_bind_int64(s, 11, r.totals.cacheCreation); sqlite3_bind_int64(s, 12, r.totals.output)
+        sqlite3_bind_int64(s, 13, r.totals.reasoning); bindText(s, 14, r.speed.rawValue)
+        if let c = r.reportedCost { sqlite3_bind_double(s, 15, c) } else { sqlite3_bind_null(s, 15) }
+        bindText(s, 16, r.rateModel); bindText(s, 17, r.tierTurn)
+        sqlite3_bind_double(s, 18, r.cost); bindText(s, 19, r.origin); bindText(s, 20, r.source)
     }
 }
 
