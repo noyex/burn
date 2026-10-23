@@ -15,12 +15,21 @@ struct SettingsView: View {
                 Text("Settings").font(.system(size: 13, weight: .semibold))
             }
 
-            Text("MENU BAR").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
-                .padding(.leading, 4)
+            if !model.connected.isEmpty {
+                sectionTitle("MENU BAR")
+                group {
+                    ForEach(Array(model.connected.enumerated()), id: \.element) { i, p in
+                        if i > 0 { Divider() }
+                        providerRow(p)
+                    }
+                }
+            }
+
+            sectionTitle("ACCOUNTS")
             group {
-                ForEach(Array(model.connected.enumerated()), id: \.element) { i, p in
+                ForEach(Array(ProviderID.allCases.enumerated()), id: \.element) { i, p in
                     if i > 0 { Divider() }
-                    providerRow(p)
+                    accountRow(p)
                 }
             }
 
@@ -46,11 +55,36 @@ struct SettingsView: View {
         }
     }
 
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+            .padding(.leading, 4)
+    }
+
     private func group(@ViewBuilder _ content: () -> some View) -> some View {
         VStack(spacing: 0) { content() }
             .padding(.horizontal, 10)
             .frame(maxWidth: .infinity)
             .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    @ViewBuilder
+    private func accountRow(_ p: ProviderID) -> some View {
+        let signedIn: Bool = {
+            guard model.connected.contains(p) else { return false }
+            if case .signedOut = model.limits[p] { return false }
+            return true
+        }()
+        HStack(spacing: 8) {
+            ProviderGlyph(provider: p)
+            Text(p.name)
+            Spacer()
+            if signedIn {
+                Text("Signed in").font(.caption).foregroundStyle(.secondary)
+            } else {
+                CommandChip(command: p.loginCommand)
+            }
+        }
+        .frame(height: 32)
     }
 
     @ViewBuilder

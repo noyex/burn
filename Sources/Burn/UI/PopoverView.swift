@@ -20,9 +20,17 @@ struct PopoverView: View {
     private var main: some View {
         VStack(alignment: .leading, spacing: 0) {
             if model.connected.isEmpty {
-                Text("No providers signed in. Sign in to Claude Code, Codex or Cursor.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Sign in to a provider in Terminal:")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    ForEach(ProviderID.allCases) { p in
+                        HStack(spacing: 8) {
+                            ProviderGlyph(provider: p)
+                            CommandChip(command: p.loginCommand)
+                        }
+                    }
+                }
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(model.connected) { p in
@@ -88,6 +96,10 @@ private struct ProviderLimitsView: View {
             }
             if case .failed(let message, _) = state {
                 Text(message).font(.caption).foregroundStyle(.secondary)
+            }
+            if case .signedOut = state {
+                Text("Signed out. Sign in again in Terminal:").font(.caption).foregroundStyle(.secondary)
+                CommandChip(command: provider.loginCommand)
             }
         }
         .accessibilityElement(children: .contain)

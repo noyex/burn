@@ -4,12 +4,14 @@ import Observation
 enum LimitState {
     case loading
     case loaded(ProviderLimits)
+    /// Credentials are missing or expired; the user has to sign in with the provider's CLI.
+    case signedOut
     /// Keeps the last good value so a transient failure doesn't blank the UI.
     case failed(String, last: ProviderLimits?)
 
     var limits: ProviderLimits? {
         switch self {
-        case .loading: nil
+        case .loading, .signedOut: nil
         case .loaded(let l): l
         case .failed(_, let last): last
         }
@@ -116,6 +118,7 @@ final class AppModel {
             for await (p, result) in group {
                 switch result {
                 case .success(let l): limits[p] = .loaded(l)
+                case .failure(LimitsError.tokenExpired), .failure(LimitsError.notConnected): limits[p] = .signedOut
                 case .failure(let e): limits[p] = .failed(e.localizedDescription, last: limits[p]?.limits)
                 }
             }

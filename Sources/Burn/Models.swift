@@ -12,6 +12,15 @@ enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .cursor: "Cursor"
         }
     }
+
+    /// Official CLI command that signs in; Burn reads the credentials it stores.
+    var loginCommand: String {
+        switch self {
+        case .claude: "claude auth login"
+        case .codex: "codex login"
+        case .cursor: "cursor-agent login"
+        }
+    }
 }
 
 /// One rate-limit window of a provider, e.g. Claude's 5-hour or weekly limit.
