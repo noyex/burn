@@ -6,12 +6,8 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left").frame(width: 24, height: 24).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
+            HStack(spacing: 10) {
+                GlassIconButton(systemName: "chevron.left", label: "Back", size: 28, action: onBack)
                 Text("Settings").font(.system(size: 13, weight: .semibold))
             }
 
@@ -31,6 +27,27 @@ struct SettingsView: View {
                     if i > 0 { Divider() }
                     accountRow(p)
                 }
+            }
+
+            sectionTitle("SHELF")
+            group {
+                HStack {
+                    Text("Keep screenshots")
+                    Spacer()
+                    Picker("Keep screenshots", selection: Binding(
+                        get: { model.settings.shelfRetentionDays },
+                        set: { model.settings.shelfRetentionDays = $0; model.shelf.prune() })) {
+                        Text("1 day").tag(1)
+                        Text("7 days").tag(7)
+                        Text("30 days").tag(30)
+                        Text("Forever").tag(0)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                    .controlSize(.small)
+                }
+                .frame(height: 32)
             }
 
             group {
@@ -64,7 +81,7 @@ struct SettingsView: View {
         VStack(spacing: 0) { content() }
             .padding(.horizontal, 10)
             .frame(maxWidth: .infinity)
-            .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
+            .glass(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     @ViewBuilder

@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 @main
 @MainActor
@@ -38,10 +39,31 @@ enum BurnMain {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: StatusItemController?
+    private var previewWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let model = AppModel()
-        statusItem = StatusItemController(model: model)
-        model.start()
+        let preview = CommandLine.arguments.contains("--preview")
+        if preview {
+            previewWindow = Self.makePreviewWindow(model: model)
+        } else {
+            statusItem = StatusItemController(model: model)
+        }
+        // A preview next to the installed app would save every copied image twice.
+        model.start(capturingClipboard: !preview)
+    }
+
+    /// Development aid: the popover content in a plain off-screen window that stays open,
+    /// so it can be captured with `screencapture -l` and driven through Accessibility.
+    private static func makePreviewWindow(model: AppModel) -> NSWindow {
+        let host = NSHostingController(rootView: PopoverView(model: model))
+        host.sizingOptions = .preferredContentSize
+        let window = NSWindow(contentViewController: host)
+        window.styleMask = [.titled, .fullSizeContentView]
+        window.title = "Burn"
+        window.titlebarAppearsTransparent = true
+        window.setFrameTopLeftPoint(NSPoint(x: -3000, y: 1000))
+        window.orderFrontRegardless()
+        return window
     }
 }

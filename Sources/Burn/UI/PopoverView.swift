@@ -4,6 +4,14 @@ import SwiftUI
 struct PopoverView: View {
     let model: AppModel
     @State private var showingSettings = false
+    @State private var selection: Set<URL> = []
+    @State private var confirmingClear = false
+    @State private var copiedSelection = false
+    @State private var resetTasks: [String: Task<Void, Never>] = [:]
+
+    private static let padding: CGFloat = 14
+    private var expanded: Bool { !showingSettings && model.settings.tab == .shelf && model.settings.shelfExpanded }
+    private var width: CGFloat { expanded ? 660 : 320 }
 
     var body: some View {
         Group {
@@ -13,11 +21,41 @@ struct PopoverView: View {
                 main
             }
         }
-        .padding(14)
-        .frame(width: 320)
+        .padding(Self.padding)
+        .frame(width: width)
     }
 
     private var main: some View {
+        @Bindable var settings = model.settings
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                GlassSegmented(options: PopoverTab.allCases, selection: $settings.tab, accessibilityLabel: "View") { $0.title }
+                if settings.tab == .shelf { expandButton }
+            }
+            switch settings.tab {
+            case .usage: usage
+            case .shelf:
+                ShelfView(shelf: model.shelf, width: width - Self.padding * 2,
+                          columns: expanded ? 4 : 2, maxHeight: expanded ? 560 : 380,
+                          selection: $selection)
+            }
+            footer.padding(.top, -2)
+        }
+        .onChange(of: model.shelf.items) { _, items in
+            // Pruned or cleared screenshots must not stay selected.
+            selection.formIntersection(items.map(\.id))
+        }
+    }
+
+    private var expandButton: some View {
+        let expanded = model.settings.shelfExpanded
+        return GlassIconButton(systemName: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                               label: expanded ? "Make shelf smaller" : "Make shelf bigger") {
+            model.settings.shelfExpanded.toggle()
+        }
+    }
+
+    private var usage: some View {
         VStack(alignment: .leading, spacing: 0) {
             if model.connected.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
@@ -49,7 +87,6 @@ struct PopoverView: View {
                 }
                 .controlSize(.small)
             }
-            footer.padding(.top, 10)
         }
     }
 
@@ -59,23 +96,73 @@ struct PopoverView: View {
     }
 
     private var footer: some View {
+        HStack(spacing: 10) {
+            switch model.settings.tab {
+            case .usage: syncStatus
+            case .shelf: shelfActions
+            }
+            GlassIconButton(systemName: "gearshape", label: "Settings", size: 26) { showingSettings = true }
+        }
+        .font(.caption)
+    }
+
+    private var syncStatus: some View {
         HStack {
             TimelineView(.periodic(from: .now, by: 30)) { ctx in
                 Text(model.syncing ? "Syncing…" : Format.synced(model.lastSync, now: ctx.date))
                     .opacity(model.hasUsage ? 1 : 0)
             }
-            .font(.caption)
             .foregroundStyle(.tertiary)
             Spacer()
-            Button { showingSettings = true } label: {
-                Image(systemName: "gearshape")
-                    .frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
+        }
+    }
+
+    @ViewBuilder
+    private var shelfActions: some View {
+        let items = model.shelf.items
+        let selected = items.filter { selection.contains($0.id) }
+        if selected.isEmpty {
+            Spacer()
+            if !items.isEmpty {
+                Button(confirmingClear ? "Clear all?" : "Clear") {
+                    if confirmingClear {
+                        confirmingClear = false
+                        withAnimation(.snappy) { model.shelf.clear() }
+                    } else {
+                        confirmingClear = true
+                        resetLater("clear", after: 3) { confirmingClear = false }
+                    }
+                }
+                .foregroundStyle(confirmingClear ? AnyShapeStyle(.red) : AnyShapeStyle(.primary))
+                .glassButton()
+                .controlSize(.small)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .help("Settings")
-            .accessibilityLabel("Settings")
+        } else {
+            Text("\(selected.count) selected").foregroundStyle(.secondary)
+            Spacer()
+            Button("Deselect") { selection = [] }
+                .glassButton()
+                .controlSize(.small)
+            Button {
+                model.shelf.copy(selected)
+                copiedSelection = true
+                resetLater("copied", after: 1.2) { copiedSelection = false }
+            } label: {
+                Text(copiedSelection ? "Copied" : "Copy \(selected.count)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(minWidth: 56)
+            }
+            .glassButton(prominent: true)
+            .controlSize(.small)
+        }
+    }
+
+    /// Runs `reset` after a delay, replacing a pending reset with the same key.
+    private func resetLater(_ key: String, after seconds: Double, _ reset: @escaping @MainActor () -> Void) {
+        resetTasks[key]?.cancel()
+        resetTasks[key] = Task {
+            try? await Task.sleep(for: .seconds(seconds))
+            if !Task.isCancelled { reset() }
         }
     }
 }
@@ -167,11 +254,7 @@ private struct UsageView: View {
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 0) {
-            Picker("Period", selection: $model.period) {
-                ForEach(Period.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            GlassSegmented(options: Period.allCases, selection: $model.period, accessibilityLabel: "Period") { $0.title }
 
             if let usage = model.usage {
                 summary(usage).padding(.top, 12)
