@@ -28,6 +28,10 @@ final class AppModel {
     private(set) var usage: UsageSummary?
     private(set) var lastSync: Date?
     private(set) var syncing = false
+    /// Percent of the current import, only while one is running.
+    private(set) var importPercent: Int?
+    /// False until at least one usage record exists (no Claude Code / Codex logs yet).
+    private(set) var hasUsage = true
     private(set) var usageError: String?
 
     var period: Period = .all {
@@ -129,15 +133,30 @@ final class AppModel {
     private func sync() async {
         guard !syncing else { return }
         syncing = true
-        if await runUsageSync() { lastSync = .now }
+        do {
+            _ = try await UsageImporter.shared.run { [weak self] p in
+                guard p.total > 0 else { return }
+                let pct = p.done * 100 / p.total
+                Task { @MainActor in
+                    if self?.importPercent != pct { self?.importPercent = pct }
+                }
+            }
+            lastSync = .now
+        } catch {
+            NSLog("Burn: import failed: \(error)")
+        }
         syncing = false
+        importPercent = nil
         await loadUsage()
     }
 
     private func loadUsage() async {
         let period = period
         let db = db
-        let result = await Task.detached { Result { try db.summary(for: period) } }.value
+        let (result, any) = await Task.detached {
+            (Result { try db.summary(for: period) }, (try? db.hasAnyUsage()) ?? false)
+        }.value
+        hasUsage = any
         guard period == self.period else { return }
         switch result {
         case .success(let s): usage = s; usageError = nil

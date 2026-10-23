@@ -17,9 +17,29 @@ final class UsageDatabase: Sendable {
     let path: String
 
     init(path: String? = nil) {
-        self.path = path
-            ?? ProcessInfo.processInfo.environment["T3_USAGE_DB"]
-            ?? NSHomeDirectory() + "/.t3-usage/usage.sqlite"
+        self.path = path ?? UsageStore.dbPath
+    }
+
+    /// True once at least one usage record has been imported.
+    func hasAnyUsage() throws -> Bool {
+        guard FileManager.default.fileExists(atPath: path) else { return false }
+        let db = try openReadOnly()
+        defer { sqlite3_close(db) }
+        var found = false
+        do { try query(db, "SELECT 1 FROM usage LIMIT 1") { _ in found = true } }
+        catch UsageDatabaseError.query(let m) where m.contains("no such table") { return false }
+        return found
+    }
+
+    private func openReadOnly() throws -> OpaquePointer? {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+            let m = db.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown"
+            sqlite3_close(db)
+            throw UsageDatabaseError.open(m)
+        }
+        sqlite3_busy_timeout(db, 3000)
+        return db
     }
 
     /// Synchronous; call off the main actor.
@@ -28,14 +48,9 @@ final class UsageDatabase: Sendable {
         cal.firstWeekday = 2 // weeks start Monday
         cal.minimumDaysInFirstWeek = 4
 
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
-            let m = db.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown"
-            sqlite3_close(db)
-            throw UsageDatabaseError.open(m)
-        }
+        // No store yet (first launch): behave like an empty one.
+        let db = FileManager.default.fileExists(atPath: path) ? try openReadOnly() : nil
         defer { sqlite3_close(db) }
-        sqlite3_busy_timeout(db, 3000)
 
         let todayStart = cal.startOfDay(for: now)
         let tomorrow = cal.date(byAdding: .day, value: 1, to: todayStart)!
@@ -98,6 +113,7 @@ final class UsageDatabase: Sendable {
     }
 
     private func query(_ db: OpaquePointer?, _ sql: String, binds: [Int64] = [], row: (OpaquePointer?) -> Void) throws {
+        guard db != nil else { return }
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             throw UsageDatabaseError.query(String(cString: sqlite3_errmsg(db)))

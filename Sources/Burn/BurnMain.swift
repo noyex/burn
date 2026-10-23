@@ -14,6 +14,14 @@ enum BurnMain {
             RunLoop.main.run()
             return
         }
+        if CommandLine.arguments.contains("--import") {
+            Task {
+                await runDebugImport()
+                exit(0)
+            }
+            RunLoop.main.run()
+            return
+        }
         let app = NSApplication.shared
         let delegate = AppDelegate()
         self.delegate = delegate

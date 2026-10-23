@@ -17,6 +17,37 @@ func runDebugDump() async {
         }
     }
 
+    printUsageSummaries()
+}
+
+/// Runs the usage importer and prints timing, totals and per-period summaries (`Burn --import`).
+func runDebugImport() async {
+    let tick = ProgressTicker()
+    let t0 = Date()
+    do {
+        let r = try await UsageImporter.shared.run { p in tick.report(p) }
+        let secs = Date().timeIntervalSince(t0)
+        print("import: \(r.parsedFiles) files parsed, \(r.newRows) new rows, \(r.totalRows) total in \(String(format: "%.2f", secs)) s -> \(UsageStore.dbPath)")
+    } catch {
+        print("import error: \(error.localizedDescription)")
+    }
+    printUsageSummaries()
+}
+
+private final class ProgressTicker: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lastDecile = -1
+    func report(_ p: ImportProgress) {
+        guard p.total > 0 else { return }
+        let decile = p.done * 10 / p.total
+        lock.lock(); defer { lock.unlock() }
+        guard decile != lastDecile else { return }
+        lastDecile = decile
+        print("  progress \(decile * 10)% (\(p.done)/\(p.total))")
+    }
+}
+
+private func printUsageSummaries() {
     let db = UsageDatabase()
     for p in Period.allCases {
         let t0 = Date()

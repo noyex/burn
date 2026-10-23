@@ -39,8 +39,16 @@ struct PopoverView: View {
                     }
                 }
             }
-            Divider().padding(.vertical, 12)
-            UsageView(model: model)
+            if model.hasUsage {
+                Divider().padding(.vertical, 12)
+                UsageView(model: model)
+            } else if let pct = model.importPercent {
+                Divider().padding(.vertical, 12)
+                ProgressView(value: Double(pct), total: 100) {
+                    Text("Importing usage from Claude Code and Codex logs…").font(.caption)
+                }
+                .controlSize(.small)
+            }
             footer.padding(.top, 10)
         }
     }
@@ -54,6 +62,7 @@ struct PopoverView: View {
         HStack {
             TimelineView(.periodic(from: .now, by: 30)) { ctx in
                 Text(model.syncing ? "Syncing…" : Format.synced(model.lastSync, now: ctx.date))
+                    .opacity(model.hasUsage ? 1 : 0)
             }
             .font(.caption)
             .foregroundStyle(.tertiary)
