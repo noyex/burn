@@ -62,7 +62,10 @@ struct SettingsView: View {
             Spacer()
             if windows.count > 1 {
                 Picker("Limit", selection: Binding(
-                    get: { model.settings.menuBarWindow(p) },
+                    get: {
+                        let id = model.settings.menuBarWindow(p)
+                        return windows.contains { $0.id == id } ? id : Settings.highest
+                    },
                     set: { model.settings.setMenuBarWindow(p, $0); model.settingsChanged() })) {
                     Text("Highest").tag(Settings.highest)
                     ForEach(windows) { Text($0.label).tag($0.id) }

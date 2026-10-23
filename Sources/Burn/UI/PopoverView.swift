@@ -203,7 +203,8 @@ private struct UsageChart: View {
 
     private var points: [Point] {
         usage.buckets.flatMap { b in
-            ProviderID.allCases.compactMap { p in b.cost[p].map { Point(start: b.start, provider: p, cost: $0) } }
+            // Zero points keep empty buckets on the axis so bars line up with the period labels.
+            ProviderID.allCases.map { p in Point(start: b.start, provider: p, cost: b.cost[p] ?? 0) }
         }
     }
 

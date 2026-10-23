@@ -38,17 +38,19 @@ final class UsageDatabase: Sendable {
         sqlite3_busy_timeout(db, 3000)
 
         let todayStart = cal.startOfDay(for: now)
+        let tomorrow = cal.date(byAdding: .day, value: 1, to: todayStart)!
         let unit: BucketUnit
         let component: Calendar.Component
-        var start: Date
-        let count: Int?
+        let start: Date
+        // Exclusive end; buckets run until they reach it (24 hours, or 23/25 on DST days).
+        let end: Date
         switch period {
         case .today:
-            (unit, component, start, count) = (.hour, .hour, todayStart, 24)
+            (unit, component, start, end) = (.hour, .hour, todayStart, tomorrow)
         case .week:
-            (unit, component, start, count) = (.day, .day, cal.date(byAdding: .day, value: -6, to: todayStart)!, 7)
+            (unit, component, start, end) = (.day, .day, cal.date(byAdding: .day, value: -6, to: todayStart)!, tomorrow)
         case .month:
-            (unit, component, start, count) = (.day, .day, cal.date(byAdding: .day, value: -29, to: todayStart)!, 30)
+            (unit, component, start, end) = (.day, .day, cal.date(byAdding: .day, value: -29, to: todayStart)!, tomorrow)
         case .all:
             var first: Int64?
             try query(db, "SELECT MIN(ts_ms) FROM usage") { stmt in
@@ -56,18 +58,17 @@ final class UsageDatabase: Sendable {
             }
             let firstDate = first.map { Date(timeIntervalSince1970: Double($0) / 1000) } ?? now
             start = cal.dateInterval(of: .weekOfYear, for: min(firstDate, now))?.start ?? todayStart
-            (unit, component, count) = (.week, .weekOfYear, nil)
+            end = cal.dateInterval(of: .weekOfYear, for: now)?.end ?? tomorrow
+            (unit, component) = (.week, .weekOfYear)
         }
 
         // Bucket start dates, contiguous.
         var starts: [Date] = []
         var cursor = start
-        let lastNeeded = cal.dateInterval(of: .weekOfYear, for: now)?.start ?? now
-        while count.map({ starts.count < $0 }) ?? (cursor <= lastNeeded) {
+        while cursor < end {
             starts.append(cursor)
             cursor = cal.date(byAdding: component, value: 1, to: cursor)!
         }
-        let end = cursor
         let startsMs = starts.map { Int64($0.timeIntervalSince1970 * 1000) }
 
         var costs = [[ProviderID: Double]](repeating: [:], count: starts.count)

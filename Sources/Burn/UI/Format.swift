@@ -45,6 +45,7 @@ enum Format {
     static func shortReset(_ date: Date?, now: Date = .now) -> String {
         guard let date else { return "" }
         let s = date.timeIntervalSince(now)
+        if s <= 0 { return "now" }
         if s < 3600 { return "\(max(1, Int(s / 60)))m" }
         if s < 86400 { return "\(Int(s / 3600))h" }
         return reset(date, now: now)

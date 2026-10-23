@@ -42,12 +42,10 @@ final class AppModel {
     ]
     @ObservationIgnored private let db = UsageDatabase()
     @ObservationIgnored private var limitsFetchedAt: Date?
+    @ObservationIgnored private var refreshingLimits = false
     @ObservationIgnored private var timers: [Timer] = []
 
     func start() {
-        connected = fetchers.filter { $0.isConnected() }.map(\.provider)
-        for p in connected { limits[p] = .loading }
-        onMenuBarChange?()
         Task { await refreshLimits() }
         Task { await loadUsage(); await sync() }
         schedule(every: 120) { [weak self] in await self?.refreshLimits() }
@@ -92,7 +90,22 @@ final class AppModel {
     // MARK: Loading
 
     private func refreshLimits() async {
+        guard !refreshingLimits else { return }
+        refreshingLimits = true
+        defer { refreshingLimits = false }
         limitsFetchedAt = .now
+
+        // Re-detect on every refresh so signing in or out of a provider shows up without a restart.
+        // isConnected() spawns `security`, so keep it off the main actor.
+        let fetchers = fetchers
+        let now = await Task.detached { fetchers.filter { $0.isConnected() }.map(\.provider) }.value
+        if now != connected {
+            for p in connected where !now.contains(p) { limits[p] = nil }
+            for p in now where limits[p] == nil { limits[p] = .loading }
+            connected = now
+            onMenuBarChange?()
+        }
+
         await withTaskGroup(of: (ProviderID, Result<ProviderLimits, Error>).self) { group in
             for f in fetchers where connected.contains(f.provider) {
                 group.addTask {

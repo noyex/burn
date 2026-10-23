@@ -12,15 +12,6 @@ enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .cursor: "Cursor"
         }
     }
-
-    /// File name (without extension) of the SVG logo in Resources.
-    var iconName: String {
-        switch self {
-        case .claude: "claude"
-        case .codex: "openai"
-        case .cursor: "cursor"
-        }
-    }
 }
 
 /// One rate-limit window of a provider, e.g. Claude's 5-hour or weekly limit.
