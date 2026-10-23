@@ -7,7 +7,6 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Burn",
-            resources: [.copy("Resources")],
             linkerSettings: [.linkedLibrary("sqlite3")]
         ),
     ]
