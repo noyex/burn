@@ -33,6 +33,27 @@ struct SettingsView: View {
                 }
             }
 
+            sectionTitle("SHELF")
+            group {
+                HStack {
+                    Text("Keep screenshots")
+                    Spacer()
+                    Picker("Keep screenshots", selection: Binding(
+                        get: { model.settings.shelfRetentionDays },
+                        set: { model.settings.shelfRetentionDays = $0; model.shelf.prune() })) {
+                        Text("1 day").tag(1)
+                        Text("7 days").tag(7)
+                        Text("30 days").tag(30)
+                        Text("Forever").tag(0)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                    .controlSize(.small)
+                }
+                .frame(height: 32)
+            }
+
             group {
                 HStack {
                     Text("Launch at login")

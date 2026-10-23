@@ -39,7 +39,7 @@ final class AppModel {
     }
 
     let settings = Settings()
-    let shelf = ShelfStore()
+    let shelf: ShelfStore
 
     /// Called whenever something shown in the menu bar changes.
     @ObservationIgnored var onMenuBarChange: (() -> Void)?
@@ -51,6 +51,10 @@ final class AppModel {
     @ObservationIgnored private var limitsFetchedAt: Date?
     @ObservationIgnored private var refreshingLimits = false
     @ObservationIgnored private var timers: [Timer] = []
+
+    init() {
+        shelf = ShelfStore(settings: settings)
+    }
 
     func start() {
         shelf.start()

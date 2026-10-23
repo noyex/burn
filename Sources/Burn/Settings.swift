@@ -33,12 +33,18 @@ final class Settings {
         didSet { defaults.set(shelfExpanded, forKey: "shelf.expanded") }
     }
 
+    /// Screenshots older than this are deleted; 0 keeps them until cleared.
+    var shelfRetentionDays: Int {
+        didSet { defaults.set(shelfRetentionDays, forKey: "shelf.retentionDays") }
+    }
+
     init() {
         hidden = Set(defaults.stringArray(forKey: "menuBar.hidden") ?? [])
         windows = defaults.dictionary(forKey: "menuBar.windows") as? [String: String] ?? [:]
         launchAtLogin = SMAppService.mainApp.status == .enabled
         tab = defaults.string(forKey: "popover.tab").flatMap(PopoverTab.init) ?? .usage
         shelfExpanded = defaults.bool(forKey: "shelf.expanded")
+        shelfRetentionDays = defaults.object(forKey: "shelf.retentionDays") as? Int ?? 7
     }
 
     func showsInMenuBar(_ p: ProviderID) -> Bool { !hidden.contains(p.rawValue) }

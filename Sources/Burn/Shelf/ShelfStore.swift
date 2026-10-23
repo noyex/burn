@@ -25,12 +25,14 @@ final class ShelfStore {
 
     private(set) var items: [ShelfItem] = []
 
+    @ObservationIgnored private let settings: Settings
     @ObservationIgnored private let pasteboard = NSPasteboard.general
     @ObservationIgnored private var changeCount: Int
     @ObservationIgnored private var lastHash: String?
-    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var timers: [Timer] = []
 
-    init() {
+    init(settings: Settings) {
+        self.settings = settings
         changeCount = pasteboard.changeCount
     }
 
@@ -38,12 +40,15 @@ final class ShelfStore {
         try? FileManager.default.createDirectory(at: Self.directory, withIntermediateDirectories: true)
         items = Self.loadItems()
         prune()
-        let t = Timer(timeInterval: 0.5, repeats: true) { _ in
-            MainActor.assumeIsolated { [weak self] in self?.poll() }
-        }
-        t.tolerance = 0.2
+        schedule(every: 0.5) { [weak self] in self?.poll() }
+        schedule(every: 3600) { [weak self] in self?.prune() }
+    }
+
+    private func schedule(every seconds: TimeInterval, _ work: @escaping @MainActor () -> Void) {
+        let t = Timer(timeInterval: seconds, repeats: true) { _ in MainActor.assumeIsolated { work() } }
+        t.tolerance = seconds * 0.4
         RunLoop.main.add(t, forMode: .common)
-        timer = t
+        timers.append(t)
     }
 
     // MARK: Actions
@@ -72,8 +77,12 @@ final class ShelfStore {
 
     func clear() { delete(items) }
 
+    /// Drops screenshots past the retention period and beyond `maxItems`.
     func prune() {
-        if items.count > Self.maxItems { delete(Array(items[Self.maxItems...])) }
+        let days = settings.shelfRetentionDays
+        let cutoff = days > 0 ? Date.now.addingTimeInterval(-Double(days) * 86400) : .distantPast
+        let doomed = items.enumerated().filter { i, item in i >= Self.maxItems || item.date < cutoff }.map(\.element)
+        if !doomed.isEmpty { delete(doomed) }
     }
 
     // MARK: Capture
