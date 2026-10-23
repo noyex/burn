@@ -52,6 +52,7 @@ database: history builds up from the first launch on.
 swift build
 .build/debug/Burn --dump     # print live limits and usage summaries
 .build/debug/Burn --import   # run the log importer once and print timings
+.build/debug/Burn --preview  # popover content in a plain off-screen window, for screenshots
 ```
 
 ## License
