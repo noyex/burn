@@ -39,6 +39,7 @@ final class AppModel {
     }
 
     let settings = Settings()
+    let shelf = ShelfStore()
 
     /// Called whenever something shown in the menu bar changes.
     @ObservationIgnored var onMenuBarChange: (() -> Void)?
@@ -52,6 +53,7 @@ final class AppModel {
     @ObservationIgnored private var timers: [Timer] = []
 
     func start() {
+        shelf.start()
         Task { await refreshLimits() }
         Task { await loadUsage(); await sync() }
         schedule(every: 120) { [weak self] in await self?.refreshLimits() }
