@@ -41,7 +41,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         item.button?.image = image
         item.button?.setAccessibilityLabel(
             entries.isEmpty ? "Burn"
-                : entries.map { "\($0.provider.name) \(Format.percent($0.percent))" }.joined(separator: ", "))
+                : entries.map { "\($0.provider.name) \(Format.remaining($0.percent)) left" }.joined(separator: ", "))
     }
 }
 
@@ -63,7 +63,7 @@ enum MenuBarImage {
         }
         struct Part { let icon: CGImage?; let text: String; let level: Level }
         let parts = entries.map { e -> Part in
-            var text = Format.percent(e.percent)
+            var text = Format.remaining(e.percent)
             if e.percent >= 100, e.resetsAt != nil { text += " · " + Format.shortReset(e.resetsAt) }
             let icon = ProviderIcon.image(e.provider)
             var rect = CGRect(x: 0, y: 0, width: iconSize * 2, height: iconSize * 2)
