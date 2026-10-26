@@ -56,8 +56,14 @@ final class Settings {
 
     /// Window id shown in the menu bar, or `highest` for whichever is most used.
     func menuBarWindow(_ p: ProviderID) -> String {
+        if let id = windows[p.rawValue] { return id }
+        switch p {
+        // The 5-hour window is the one that actually blocks work during the day.
+        case .claude: return "5h"
         // Cursor's API bucket often sits at 100% while the plan as a whole is fine.
-        windows[p.rawValue] ?? (p == .cursor ? "total" : Self.highest)
+        case .cursor: return "total"
+        default: return Self.highest
+        }
     }
 
     func setMenuBarWindow(_ p: ProviderID, _ id: String) {
