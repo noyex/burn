@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Grid of copied screenshots. Click copies, the corner circle or ⌘-click selects, dragging drops files anywhere.
+/// Grid of copied screenshots. Click copies that screenshot, the corner circle or ⌘-click selects, dragging drops files anywhere.
 struct ShelfView: View {
     let shelf: ShelfStore
     let width: CGFloat
@@ -61,6 +61,7 @@ struct ShelfView: View {
         return ShelfTile.Actions(
             toggle: { selection.formSymmetricDifference([item.id]) },
             copy: { shelf.copy(group()) },
+            copyOne: { shelf.copy([item]) },
             open: { NSWorkspace.shared.open(item.url) },
             reveal: { NSWorkspace.shared.activateFileViewerSelecting(group().map(\.url)) },
             delete: {
@@ -80,6 +81,7 @@ private struct ShelfTile: View {
     struct Actions {
         let toggle: () -> Void
         let copy: () -> Void
+        let copyOne: () -> Void
         let open: () -> Void
         let reveal: () -> Void
         let delete: () -> Void
@@ -165,10 +167,10 @@ private struct ShelfTile: View {
     private var handlers: TileInteraction.Handlers {
         TileInteraction.Handlers(
             click: { inCheckbox, modifiers in
-                if inCheckbox || selecting || modifiers.contains(.command) {
+                if inCheckbox || modifiers.contains(.command) {
                     actions.toggle()
                 } else {
-                    actions.copy()
+                    actions.copyOne()
                     flashCopied()
                 }
             },
