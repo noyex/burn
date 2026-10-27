@@ -1,7 +1,19 @@
 import SwiftUI
 
+/// The see-through canvas the window gives the content, and where the menu bar icon sits along
+/// it. The content hangs centered under the icon and moves itself when its width changes.
+@MainActor @Observable
+final class PanelCanvas {
+    /// Room for the widest and tallest the content can get; the window never resizes while open.
+    static let maxSize = CGSize(width: PopoverView.expandedWidth + Bento.shadowInset.leading + Bento.shadowInset.trailing,
+                                height: 800)
+    var width = maxSize.width
+    var anchorX = maxSize.width / 2
+}
+
 struct PopoverView: View {
     let model: AppModel
+    let canvas: PanelCanvas
     @State private var showingSettings = false
     @State private var selection: Set<URL> = []
     @State private var confirmingClear = false
@@ -13,18 +25,28 @@ struct PopoverView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var theme: Theme { Theme(scheme) }
-    private var expanded: Bool { !showingSettings && model.settings.tab == .shelf && model.settings.shelfExpanded }
+    private static let usageWidth: CGFloat = 304
+    static let expandedWidth: CGFloat = 644
+    /// Doesn't depend on the tab, so the shelf keeps its grid while it fades out.
+    private var shelfWidth: CGFloat { model.settings.shelfExpanded ? Self.expandedWidth : Self.usageWidth }
     /// Width of the blocks; the panel adds room for their shadows around it.
-    private var width: CGFloat { expanded ? 644 : 304 }
+    private var width: CGFloat { !showingSettings && model.settings.tab == .shelf ? shelfWidth : Self.usageWidth }
+    /// Left edge of the content on the canvas: centered under the icon, kept on screen. Comes
+    /// from the same state as `width`, so the two animate in step.
+    private var contentX: CGFloat {
+        let total = width + Bento.shadowInset.leading + Bento.shadowInset.trailing
+        return min(max(canvas.anchorX - total / 2, 0), max(canvas.width - total, 0))
+    }
 
     var body: some View {
         let visible = model.popoverVisible
-        Group {
+        ZStack(alignment: .topLeading) {
             if showingSettings {
-                SettingsView(model: model) { showingSettings = false }
+                SettingsView(model: model) { withAnimation(.snappy(duration: 0.25)) { showingSettings = false } }
                     .block(theme.surface)
+                    .transition(tabTransition)
             } else {
-                main
+                main.transition(tabTransition)
             }
         }
         .frame(width: width)
@@ -32,11 +54,16 @@ struct PopoverView: View {
         // fall through to the window below and close the panel.
         .background(Color.black.opacity(0.001))
         .padding(Bento.shadowInset)
+        .fixedSize(horizontal: false, vertical: true)
         .foregroundStyle(theme.text)
         // Grows out of the menu bar icon; only animates in, the panel fades itself out.
         .scaleEffect(visible || reduceMotion ? 1 : 0.96, anchor: .top)
         .opacity(visible ? 1 : 0)
         .animation(visible ? .easeOut(duration: 0.2) : nil, value: visible)
+        .offset(x: contentX)
+        // Under Reduce Motion the content changes place and size without sliding there.
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: contentX)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var main: some View {
@@ -45,18 +72,22 @@ struct PopoverView: View {
             HStack(spacing: Bento.gap) {
                 IconSwitcher(selection: $settings.tab)
                 Spacer()
-                if settings.tab == .shelf { expandButton }
+                if settings.tab == .shelf {
+                    expandButton.transition(.opacity.combined(with: .scale(scale: 0.8)))
+                }
             }
             .padding(.bottom, 2)
-            // Stacked, so the outgoing tab fades out in place while the new one fades in.
-            ZStack(alignment: .top) {
+            // Stacked, so the outgoing tab fades out in place while the new one fades in. Only the
+            // incoming tab counts toward the layout, so the footer glides straight to where it ends.
+            ZStack(alignment: .topLeading) {
                 switch settings.tab {
                 case .usage:
                     VStack(alignment: .leading, spacing: Bento.gap) { usage }
+                        .frame(width: Self.usageWidth)
                         .transition(tabTransition)
                 case .shelf:
-                    ShelfView(shelf: model.shelf, width: width,
-                              columns: expanded ? 4 : 2, maxHeight: expanded ? 560 : 380,
+                    ShelfView(shelf: model.shelf, width: shelfWidth,
+                              columns: settings.shelfExpanded ? 4 : 2, maxHeight: settings.shelfExpanded ? 560 : 380,
                               selection: $selection)
                         .transition(tabTransition)
                 }
@@ -69,8 +100,11 @@ struct PopoverView: View {
         }
     }
 
+    /// The new view settles in while the old one gets out of the way quickly, so they don't
+    /// pile up on each other.
     private var tabTransition: AnyTransition {
-        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97, anchor: .top))
+        .asymmetric(insertion: reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98, anchor: .top)),
+                    removal: .opacity.animation(.easeOut(duration: 0.12)))
     }
 
     private var expandButton: some View {
@@ -156,18 +190,26 @@ struct PopoverView: View {
     // MARK: Footer
 
     private var footer: some View {
-        HStack(spacing: Bento.gap) {
-            switch model.settings.tab {
-            case .usage:
-                syncStatus
-                if let usage = model.usage, usage.cost > 0 { shareButton(usage) }
-            case .shelf: shelfActions
+        let onUsage = model.settings.tab == .usage
+        return HStack(spacing: Bento.gap) {
+            // Both rows stay in the tree and crossfade: a row that was inserted or removed would
+            // not ride along while the footer slides to the other tab's height.
+            ZStack(alignment: .leading) {
+                HStack(spacing: Bento.gap) {
+                    syncStatus
+                    if let usage = model.usage, usage.cost > 0 { shareButton(usage) }
+                }
+                .footerRow(shown: onUsage)
+                HStack(spacing: Bento.gap) { shelfActions }
+                    .footerRow(shown: !onUsage)
             }
             if let release = updateShown {
                 updateButton(release)
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9)))
             }
-            RoundIconButton(systemName: "gearshape", label: "Settings") { showingSettings = true }
+            RoundIconButton(systemName: "gearshape", label: "Settings") {
+                withAnimation(.snappy(duration: 0.25)) { showingSettings = true }
+            }
         }
         .font(.brand(11))
         .padding(4)
@@ -273,5 +315,16 @@ struct PopoverView: View {
             try? await Task.sleep(for: .seconds(seconds))
             if !Task.isCancelled { reset() }
         }
+    }
+}
+
+private extension View {
+    /// Fades a footer row in with the tab switch and out ahead of it, so the two don't pile up.
+    func footerRow(shown: Bool) -> some View {
+        opacity(shown ? 1 : 0)
+            .animation(shown ? .snappy(duration: 0.25) : .easeOut(duration: 0.12), value: shown)
+            .allowsHitTesting(shown)
+            .disabled(!shown)
+            .accessibilityHidden(!shown)
     }
 }

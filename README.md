@@ -14,7 +14,7 @@ Live rate limits for Claude Code, Codex and Cursor, plus what your usage would h
 
 [**Download Burn.dmg**](https://github.com/noyex/burn/releases/latest/download/Burn.dmg)
 
-<img src="docs/screenshot.png" width="360" alt="Burn popover">
+<img src="docs/screenshot.png" width="560" alt="Burn popover">
 
 </div>
 
@@ -106,8 +106,12 @@ swift build
 .build/debug/Burn --preview  # popover content in a plain off-screen window, for screenshots
 ```
 
-Releasing: `scripts/release.sh v1.2.3` on an up-to-date `main` tags the commit, builds a universal
-`Burn.dmg` and `Burn.zip` (`scripts/package.sh`) and publishes them as a GitHub release.
+Releasing: **Actions → Release → Run workflow** with a version like `v1.2.3` (or
+`gh workflow run release.yml -f version=v1.2.3`). It tags `main`, builds a universal `Burn.dmg` and
+`Burn.zip` (`scripts/package.sh`) and publishes them as a GitHub release. `scripts/release.sh v1.2.3`
+does the same locally.
+
+Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
