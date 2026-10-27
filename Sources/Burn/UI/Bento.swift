@@ -136,7 +136,7 @@ struct IconSwitcher: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(PressStyle())
-                .help(tab.title)
+                .hoverTip(tab.title)
                 .accessibilityLabel(tab.title)
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
@@ -178,7 +178,7 @@ struct RoundIconButton: View {
         }
         .buttonStyle(PressStyle())
         .onHover { h in withAnimation(.easeOut(duration: 0.15)) { hovering = h } }
-        .help(label)
+        .hoverTip(label)
         .accessibilityLabel(label)
     }
 }

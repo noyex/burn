@@ -55,6 +55,7 @@ struct PopoverView: View {
         .background(Color.black.opacity(0.001))
         .padding(Bento.shadowInset)
         .fixedSize(horizontal: false, vertical: true)
+        .hoverTipHost()
         .foregroundStyle(theme.text)
         // Grows out of the menu bar icon; only animates in, the panel fades itself out.
         .scaleEffect(visible || reduceMotion ? 1 : 0.96, anchor: .top)
@@ -227,7 +228,7 @@ struct PopoverView: View {
         return Button(installing ? "Updating…" : "Update") { model.updater.install() }
             .buttonStyle(PillButtonStyle(prominent: true))
             .disabled(installing)
-            .help("Update to Burn \(release.version)")
+            .hoverTip("Update to Burn \(release.version)")
     }
 
     private var syncStatus: some View {
@@ -269,7 +270,7 @@ struct PopoverView: View {
         }
         .buttonStyle(PressStyle())
         .onHover { h in withAnimation(.easeOut(duration: 0.15)) { hoveringShare = h } }
-        .help("Copy an image of your spend")
+        .hoverTip("Copy an image of your spend")
         .accessibilityLabel(copiedShare ? "Copied" : "Copy an image of your spend")
     }
 

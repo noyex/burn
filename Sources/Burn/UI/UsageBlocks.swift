@@ -82,11 +82,12 @@ struct ProviderBlock: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 10))
                     .opacity(0.7)
-                    .help(message)
+                    .hoverTip(message)
                     .accessibilityLabel(message)
             }
             if let primary, MenuBarImage.Level(primary.percent) != .normal {
                 alertPill(MenuBarImage.Level(primary.percent) == .full ? "Empty" : "Low", level: .init(primary.percent))
+                    .hoverTip(alertTip(primary))
             }
         }
         .foregroundStyle(ink)
@@ -116,7 +117,7 @@ struct ProviderBlock: View {
 
     private func heroSecondary(_ w: LimitWindow) -> some View {
         VStack(alignment: .trailing, spacing: 1) {
-            Text(w.label).font(.brand(11)).opacity(0.75)
+            label(w).font(.brand(11)).opacity(0.75)
             value(w, size: 22)
             Text(Format.reset(w.resetsAt)).font(.brand(11)).opacity(0.75)
         }
@@ -128,7 +129,7 @@ struct ProviderBlock: View {
 
     private func smallSecondary(_ w: LimitWindow) -> some View {
         HStack(spacing: 4) {
-            Text(w.label).opacity(0.75)
+            label(w).opacity(0.75)
             value(w, size: 11)
             let reset = Format.reset(w.resetsAt)
             if !reset.isEmpty { Text("· \(reset)").opacity(0.75) }
@@ -141,20 +142,34 @@ struct ProviderBlock: View {
         .accessibilityValue("\(remaining(w))% left, resets \(Format.reset(w.resetsAt))")
     }
 
-    /// A secondary value; low or empty ones sit in a pill so they stand out on any block color.
-    @ViewBuilder
-    private func value(_ w: LimitWindow, size: CGFloat) -> some View {
-        let level = MenuBarImage.Level(w.percent)
-        let text = Text("\(remaining(w))%").font(.brand(size, size > 14 ? .display : .bold)).monospacedDigit()
-        if level == .normal {
-            text
-        } else {
-            alertPill(nil, level: level, text: text)
+    /// A secondary label; low or empty ones get a warning glyph instead of a pill around the value.
+    private func label(_ w: LimitWindow) -> some View {
+        HStack(spacing: 3) {
+            if MenuBarImage.Level(w.percent) != .normal {
+                Image(systemName: "exclamationmark.circle.fill").font(.system(size: 10, weight: .semibold))
+                    .hoverTip(alertTip(w))
+            }
+            Text(w.label)
         }
     }
 
-    private func alertPill(_ title: String?, level: MenuBarImage.Level, text: Text? = nil) -> some View {
-        (text ?? Text(title ?? "").font(.brand(10, .bold)))
+    /// Why a window is flagged, and when it comes back.
+    private func alertTip(_ w: LimitWindow) -> String {
+        let reset = Format.reset(w.resetsAt)
+        let state = MenuBarImage.Level(w.percent) == .full
+            ? "\(w.label) limit used up"
+            : "\(w.label) limit almost used up, \(remaining(w))% left"
+        guard !reset.isEmpty else { return state }
+        let soon = w.resetsAt.map { (1..<86400).contains($0.timeIntervalSinceNow) } == true
+        return soon ? "\(state). Resets in \(reset)" : "\(state). Resets \(reset)"
+    }
+
+    private func value(_ w: LimitWindow, size: CGFloat) -> some View {
+        Text("\(remaining(w))%").font(.brand(size, size > 14 ? .display : .bold)).monospacedDigit()
+    }
+
+    private func alertPill(_ title: String, level: MenuBarImage.Level) -> some View {
+        Text(title).font(.brand(10, .bold))
             .foregroundStyle(theme.alert(level, on: provider))
             .padding(.horizontal, 6)
             .padding(.vertical, 1)
@@ -193,7 +208,7 @@ struct ProviderIssueRow: View {
             switch state {
             case .signedOut:
                 CommandChip(command: provider.loginCommand)
-                    .help("Signed out. Sign in again in Terminal")
+                    .hoverTip("Signed out. Sign in again in Terminal")
             case .failed(let message, _):
                 Text(message).font(.brand(11)).foregroundStyle(theme.secondary).lineLimit(1)
             default:
@@ -233,7 +248,7 @@ struct SpendBlock: View {
             HStack {
                 Text("Spent")
                     .font(.brand(12, .bold))
-                    .help("Estimated at API list prices")
+                    .hoverTip("Estimated at API list prices")
                 Spacer()
                 PillSegmented(options: Period.allCases, selection: $model.period,
                               style: .init(track: Theme.limeInk.opacity(0.08), selected: Theme.limeInk,
@@ -303,6 +318,7 @@ struct SpendBars: View {
     let ink: Color
 
     @State private var grown: Bool
+    @State private var hovered: Date?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// `animated: false` draws the bars at full height right away, e.g. for an image render.
@@ -323,11 +339,24 @@ struct SpendBars: View {
             HStack(alignment: .bottom, spacing: spacing) {
                 ForEach(buckets) { b in
                     bar(b, peak: peak, height: geo.size.height)
+                        .opacity(hovered == nil || hovered == b.id ? 1 : 0.45)
+                        // The whole column, so the tip sits above the chart, not on the bar.
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .hoverTip(tip(b), isShown: hovered == b.id)
                 }
             }
             // Keeps bars on the baseline even when the tallest is shorter than the frame (no spend).
             .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
             .scaleEffect(x: 1, y: grown ? 1 : 0.02, anchor: .bottom)
+            .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                var next: Date?
+                if case .active(let p) = phase, !buckets.isEmpty {
+                    next = buckets[min(max(Int(p.x / slot), 0), buckets.count - 1)].id
+                }
+                guard next != hovered else { return }
+                withAnimation(.easeOut(duration: 0.15)) { hovered = next }
+            }
         }
         .onAppear {
             guard !grown else { return }
@@ -354,6 +383,22 @@ struct SpendBars: View {
         }
         .frame(maxWidth: .infinity)
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 1.5, topTrailingRadius: 1.5))
+    }
+
+    /// "Tue, 3 Mar\n$4.20 · Claude $3.00 · Codex $1.20"
+    private func tip(_ b: UsageBucket) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US")
+        switch usage.unit {
+        case .hour: f.dateFormat = "HH:mm"
+        case .day: f.dateFormat = "EEE, d MMM"
+        case .week: f.dateFormat = "'Week of' d MMM"
+        }
+        let split = ProviderID.allCases.compactMap { p in
+            b.cost[p].flatMap { $0 > 0 ? "\(p.name) \(Format.money($0))" : nil }
+        }
+        let cost = split.count > 1 ? ([Format.money(b.total)] + split).joined(separator: " · ") : Format.money(b.total)
+        return "\(f.string(from: b.start))\n\(cost)"
     }
 
     private var peakDescription: String {

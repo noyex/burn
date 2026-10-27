@@ -29,7 +29,7 @@ struct CommandChip: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("Copy")
+        .hoverTip("Copy")
         .accessibilityLabel("Copy command \(command)")
     }
 }
