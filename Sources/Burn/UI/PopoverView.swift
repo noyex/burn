@@ -5,7 +5,8 @@ import SwiftUI
 @MainActor @Observable
 final class PanelCanvas {
     /// Room for the widest and tallest the content can get; the window never resizes while open.
-    static let maxSize = CGSize(width: 644 + Bento.shadowInset.leading + Bento.shadowInset.trailing, height: 800)
+    static let maxSize = CGSize(width: PopoverView.expandedWidth + Bento.shadowInset.leading + Bento.shadowInset.trailing,
+                                height: 800)
     var width = maxSize.width
     var anchorX = maxSize.width / 2
 }
@@ -25,8 +26,9 @@ struct PopoverView: View {
 
     private var theme: Theme { Theme(scheme) }
     private static let usageWidth: CGFloat = 304
+    static let expandedWidth: CGFloat = 644
     /// Doesn't depend on the tab, so the shelf keeps its grid while it fades out.
-    private var shelfWidth: CGFloat { model.settings.shelfExpanded ? 644 : 304 }
+    private var shelfWidth: CGFloat { model.settings.shelfExpanded ? Self.expandedWidth : Self.usageWidth }
     /// Width of the blocks; the panel adds room for their shadows around it.
     private var width: CGFloat { !showingSettings && model.settings.tab == .shelf ? shelfWidth : Self.usageWidth }
     /// Left edge of the content on the canvas: centered under the icon, kept on screen. Comes
@@ -59,6 +61,8 @@ struct PopoverView: View {
         .opacity(visible ? 1 : 0)
         .animation(visible ? .easeOut(duration: 0.2) : nil, value: visible)
         .offset(x: contentX)
+        // Under Reduce Motion the content changes place and size without sliding there.
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: contentX)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -302,6 +306,7 @@ private extension View {
         opacity(shown ? 1 : 0)
             .animation(shown ? .snappy(duration: 0.25) : .easeOut(duration: 0.12), value: shown)
             .allowsHitTesting(shown)
+            .disabled(!shown)
             .accessibilityHidden(!shown)
     }
 }

@@ -100,18 +100,31 @@ final class StatusItemController: NSObject {
         let icon = window.convertToScreen(button.convert(button.bounds, to: nil))
         let visible = screen.visibleFrame
         let top = icon.minY - 2
+        // May reach over the Dock, like a menu does, so a short screen cuts off as little as possible.
         let size = NSSize(width: min(PanelCanvas.maxSize.width, visible.width),
-                          height: min(PanelCanvas.maxSize.height, top - visible.minY))
+                          height: min(PanelCanvas.maxSize.height, top - screen.frame.minY))
         let x = max(min(icon.midX - size.width / 2, visible.maxX - size.width), visible.minX).rounded()
         panel.setFrame(NSRect(x: x, y: top - size.height, width: size.width, height: size.height), display: false)
         canvas.width = size.width
         canvas.anchorX = (icon.midX - x).rounded()
     }
 
+    /// Re-centers the open content under the icon after the status item changed width.
+    private func realign() {
+        guard isOpen, let button = item.button, let window = button.window else { return }
+        let icon = window.convertToScreen(button.convert(button.bounds, to: nil))
+        let anchorX = (icon.midX - panel.frame.minX).rounded()
+        guard anchorX != canvas.anchorX else { return }
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) { canvas.anchorX = anchorX }
+    }
+
     private func render() {
         let entries = model.menuBarEntries
         let image = MenuBarImage.make(entries: entries)
         item.button?.image = image
+        // The button takes its new width on the next layout pass.
+        DispatchQueue.main.async { [weak self] in self?.realign() }
         item.button?.setAccessibilityLabel(
             entries.isEmpty ? "Burn"
                 : entries.map { "\($0.provider.name) \(Format.remaining($0.percent)) left" }.joined(separator: ", "))
