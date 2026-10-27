@@ -23,7 +23,13 @@ final class StatusItemController: NSObject {
         host.sizingOptions = .preferredContentSize
         host.view.wantsLayer = true
         host.view.layer?.backgroundColor = .clear
-        panel.contentView = host.view
+        // The hosting view hangs from the top of a plain container, so when the panel grows
+        // downward AppKit doesn't drag the content along with the bottom edge for a frame.
+        let container = NSView()
+        container.wantsLayer = true
+        host.view.autoresizingMask = [.width, .minYMargin]
+        container.addSubview(host.view)
+        panel.contentView = container
         panel.onCancel = { [weak self] in self?.close() }
         // Whatever resizes the panel (expanding the shelf, the hosting view itself),
         // it must not end up past the edge of the screen.
@@ -129,6 +135,11 @@ final class StatusItemController: NSObject {
         let visible = screen.visibleFrame
         let x = max(min(icon.midX - size.width / 2, visible.maxX - size.width), visible.minX)
         let frame = NSRect(x: x, y: icon.minY - 2 - size.height, width: size.width, height: size.height)
+        // Resize the hosting view first, keeping its top edge; the panel then follows.
+        if let container = panel.contentView {
+            let bounds = container.bounds
+            host.view.frame = NSRect(x: 0, y: bounds.height - size.height, width: bounds.width, height: size.height)
+        }
         guard animated else { return panel.setFrame(frame, display: true) }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.25
