@@ -30,8 +30,9 @@ final class Updater {
         var req = URLRequest(url: Self.latestURL)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         guard let (status, data) = try? await httpData(req), status == 200,
-              let release = Self.parse(data), Self.isNewer(release.version, than: Self.current) else { return }
-        available = release
+              let release = Self.parse(data) else { return }
+        // Cleared again when the release was pulled or this copy got updated some other way.
+        available = Self.isNewer(release.version, than: Self.current) ? release : nil
     }
 
     /// Downloads the release, swaps it in once this process exits and relaunches.
@@ -115,11 +116,12 @@ final class Updater {
     }
 
     /// Starts a detached script that waits for this process to exit, swaps the bundle (restoring the old one
-    /// if the copy fails) and opens the result.
+    /// if the copy fails) and opens the result. Gives up without touching anything if the app doesn't quit.
     nonisolated private static func relaunch(replacing dest: URL, with app: URL, cleaning tmp: URL) throws {
         let script = """
         pid="$1"; new="$2"; dest="$3"; tmp="$4"
-        for _ in $(seq 1 100); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+        for _ in $(seq 1 300); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+        if kill -0 "$pid" 2>/dev/null; then rm -rf "$tmp"; exit 1; fi
         rm -rf "$dest.old"
         if mv "$dest" "$dest.old"; then
           if ditto "$new" "$dest"; then rm -rf "$dest.old"; else rm -rf "$dest"; mv "$dest.old" "$dest"; fi

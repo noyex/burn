@@ -163,8 +163,7 @@ struct PopoverView: View {
                 if let usage = model.usage, usage.cost > 0 { shareButton(usage) }
             case .shelf: shelfActions
             }
-            // Kept out of the way while screenshots are selected, the footer is full then.
-            if let release = model.updater.available, model.settings.tab == .usage || selection.isEmpty {
+            if let release = updateShown {
                 updateButton(release)
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9)))
             }
@@ -173,7 +172,12 @@ struct PopoverView: View {
         .font(.brand(11))
         .padding(4)
         .floating(theme.surface, in: Capsule())
-        .animation(.easeOut(duration: 0.2), value: model.updater.available)
+        .animation(.easeOut(duration: 0.2), value: updateShown)
+    }
+
+    /// Kept out of the way while screenshots are selected, the footer is full then.
+    private var updateShown: Updater.Release? {
+        model.settings.tab == .usage || selection.isEmpty ? model.updater.available : nil
     }
 
     private func updateButton(_ release: Updater.Release) -> some View {

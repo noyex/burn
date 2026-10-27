@@ -59,14 +59,16 @@ final class AppModel {
         shelf = ShelfStore(settings: settings)
     }
 
-    func start(capturingClipboard: Bool = true) {
+    func start(capturingClipboard: Bool = true, checkingUpdates: Bool = true) {
         shelf.start(capturing: capturingClipboard)
         Task { await refreshLimits() }
         Task { await loadUsage(); await sync() }
         schedule(every: 120) { [weak self] in await self?.refreshLimits() }
         schedule(every: 300) { [weak self] in await self?.sync() }
-        Task { await updater.check() }
-        schedule(every: 86_400) { [weak self] in await self?.updater.check() }
+        if checkingUpdates {
+            Task { await updater.check() }
+            schedule(every: 86_400) { [weak self] in await self?.updater.check() }
+        }
     }
 
     func popoverOpened() {

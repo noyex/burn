@@ -72,7 +72,7 @@ struct SettingsView: View {
                 Button("Quit Burn") { NSApp.terminate(nil) }
                     .buttonStyle(.plain)
                 Spacer()
-                Text("Burn \(Updater.current)")
+                if Updater.current != "0.0.0" { Text("Burn \(Updater.current)") }
             }
             .foregroundStyle(theme.secondary)
             .font(.brand(11))
