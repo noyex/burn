@@ -21,6 +21,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         item.button?.action = #selector(toggle)
         item.button?.imagePosition = .imageOnly
         model.onMenuBarChange = { [weak self] in self?.render() }
+        model.popoverVisible = false
         render()
     }
 
@@ -35,6 +36,24 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         }
     }
 
+    func popoverWillShow(_ notification: Notification) {
+        model.popoverVisible = true
+        paintChrome()
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        model.popoverVisible = false
+    }
+
+    /// Fills the popover's frame view, arrow included, with the bento base instead of the system material.
+    private func paintChrome() {
+        guard let frame = popover.contentViewController?.view.superview,
+              !frame.subviews.contains(where: { $0 is ChromeBackground }) else { return }
+        let bg = ChromeBackground(frame: frame.bounds)
+        bg.autoresizingMask = [.width, .height]
+        frame.addSubview(bg, positioned: .below, relativeTo: nil)
+    }
+
     private func render() {
         let entries = model.menuBarEntries
         let image = MenuBarImage.make(entries: entries)
@@ -42,6 +61,15 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         item.button?.setAccessibilityLabel(
             entries.isEmpty ? "Burn"
                 : entries.map { "\($0.provider.name) \(Format.remaining($0.percent)) left" }.joined(separator: ", "))
+    }
+}
+
+private final class ChromeBackground: NSView {
+    override var wantsUpdateLayer: Bool { true }
+    override func updateLayer() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = Theme.baseNSColor.cgColor
+        }
     }
 }
 

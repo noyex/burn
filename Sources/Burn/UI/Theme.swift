@@ -97,7 +97,8 @@ enum BrandFont {
               let urls = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
                   .filter({ $0.pathExtension == "ttf" }),
               !urls.isEmpty else { return }
-        CTFontManagerRegisterFontsForURLs(urls as CFArray, .process, nil)
+        // No handler: blocks until the fonts are registered.
+        CTFontManagerRegisterFontURLs(urls as CFArray, .process, true, nil)
         available = NSFont(name: BrandFont.display.postScriptName, size: 12) != nil
     }
 
