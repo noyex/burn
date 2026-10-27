@@ -22,19 +22,21 @@ struct BigPercent: View {
     }
 }
 
-/// One provider as a solid block in its brand color. The hero block spans the full width
-/// and lists the other windows on the right; small blocks list them below.
+/// One provider as a solid block in its card color. L spans the full width and lists the other
+/// windows on the right; M lists them below; S is a single row with a bar of what's left.
 struct ProviderBlock: View {
     let provider: ProviderID
     let state: LimitState
-    /// Window shown big; the one the menu bar shows.
+    /// Window shown big.
     let primary: LimitWindow?
-    let hero: Bool
+    let size: CardSize
+    let color: CardColor
 
     @Environment(\.colorScheme) private var scheme
 
     private var theme: Theme { Theme(scheme) }
-    private var ink: Color { theme.ink(provider) }
+    private var ink: Color { theme.ink(color) }
+    private var hero: Bool { size == .l }
 
     var body: some View {
         Group {
@@ -47,17 +49,28 @@ struct ProviderBlock: View {
                 skeleton
             }
         }
-        .frame(maxWidth: .infinity, minHeight: hero ? 96 : 92, alignment: .topLeading)
-        .block(theme.fill(provider))
+        .frame(maxWidth: .infinity, minHeight: size == .s ? 0 : hero ? 96 : 92, alignment: .topLeading)
+        .block(theme.fill(color), padding: size == .s ? 10 : 12)
         .accessibilityElement(children: .combine)
     }
 
+    @ViewBuilder
     private func content(_ limits: ProviderLimits, primary: LimitWindow) -> some View {
         let others = limits.windows.filter { $0.id != primary.id }
-        return VStack(alignment: .leading, spacing: 0) {
-            header(plan: limits.plan, primary: primary)
-            Spacer(minLength: 10)
-            if hero {
+        switch size {
+        case .s:
+            compact(limits, primary: primary)
+        case .m:
+            VStack(alignment: .leading, spacing: 0) {
+                header(plan: limits.plan, primary: primary)
+                Spacer(minLength: 10)
+                primaryStack(primary, size: 38)
+                ForEach(others) { smallSecondary($0).padding(.top, 3) }
+            }
+        case .l:
+            VStack(alignment: .leading, spacing: 0) {
+                header(plan: limits.plan, primary: primary)
+                Spacer(minLength: 10)
                 HStack(alignment: .bottom) {
                     primaryStack(primary, size: 52)
                     Spacer(minLength: 8)
@@ -65,14 +78,30 @@ struct ProviderBlock: View {
                         ForEach(others) { heroSecondary($0) }
                     }
                 }
-            } else {
-                primaryStack(primary, size: 38)
-                ForEach(others) { smallSecondary($0).padding(.top, 3) }
             }
         }
     }
 
-    private func header(plan: String?, primary: LimitWindow?) -> some View {
+    private func compact(_ limits: ProviderLimits, primary: LimitWindow) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            header(plan: limits.plan, primary: primary) {
+                value(primary, size: 20).foregroundStyle(ink)
+                    .contentTransition(.numericText(value: Double(remaining(primary))))
+                    .animation(.snappy(duration: 0.3), value: remaining(primary))
+            }
+            RemainingBar(fraction: Double(remaining(primary)) / 100, ink: ink)
+            Text(caption(primary))
+                .font(.brand(11))
+                .foregroundStyle(ink.opacity(0.75))
+                .lineLimit(1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(provider.name) \(primary.label)")
+        .accessibilityValue("\(remaining(primary))% left, resets \(Format.reset(primary.resetsAt))")
+    }
+
+    private func header(plan: String?, primary: LimitWindow?,
+                        @ViewBuilder trailing: () -> some View = { EmptyView() }) -> some View {
         HStack(spacing: 5) {
             ProviderGlyph(provider: provider, size: 12, color: ink)
             Text(provider.name).font(.brand(12, .bold))
@@ -89,6 +118,7 @@ struct ProviderBlock: View {
                 alertPill(MenuBarImage.Level(primary.percent) == .full ? "Empty" : "Low", level: .init(primary.percent))
                     .hoverTip(alertTip(primary))
             }
+            trailing()
         }
         .foregroundStyle(ink)
         .lineLimit(1)
@@ -170,25 +200,59 @@ struct ProviderBlock: View {
 
     private func alertPill(_ title: String, level: MenuBarImage.Level) -> some View {
         Text(title).font(.brand(10, .bold))
-            .foregroundStyle(theme.alert(level, on: provider))
+            .foregroundStyle(theme.alert(level, on: color))
             .padding(.horizontal, 6)
             .padding(.vertical, 1)
             .background(ink, in: Capsule())
     }
 
     /// Same footprint as the loaded block, so nothing jumps when limits arrive.
+    @ViewBuilder
     private var skeleton: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header(plan: nil, primary: nil)
-            Spacer(minLength: 10)
-            Pulse {
-                VStack(alignment: .leading, spacing: 6) {
-                    Capsule().fill(ink.opacity(0.22)).frame(width: hero ? 92 : 64, height: hero ? 40 : 30)
-                    Capsule().fill(ink.opacity(0.16)).frame(width: 84, height: 9)
+        if size == .s {
+            VStack(alignment: .leading, spacing: 5) {
+                header(plan: nil, primary: nil) {
+                    Pulse { Capsule().fill(ink.opacity(0.22)).frame(width: 36, height: 16) }
+                }
+                Pulse {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Capsule().fill(ink.opacity(0.16)).frame(maxWidth: .infinity).frame(height: 4)
+                        Capsule().fill(ink.opacity(0.16)).frame(width: 84, height: 9)
+                    }
                 }
             }
+            .accessibilityLabel("\(provider.name) loading")
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                header(plan: nil, primary: nil)
+                Spacer(minLength: 10)
+                Pulse {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Capsule().fill(ink.opacity(0.22)).frame(width: hero ? 92 : 64, height: hero ? 40 : 30)
+                        Capsule().fill(ink.opacity(0.16)).frame(width: 84, height: 9)
+                    }
+                }
+            }
+            .accessibilityLabel("\(provider.name) loading")
         }
-        .accessibilityLabel("\(provider.name) loading")
+    }
+}
+
+/// Thin bar of what's left in a window.
+private struct RemainingBar: View {
+    let fraction: Double
+    let ink: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            Capsule().fill(ink.opacity(0.2))
+                .overlay(alignment: .leading) {
+                    Capsule().fill(ink).frame(width: geo.size.width * min(max(fraction, 0), 1))
+                }
+        }
+        .frame(height: 4)
+        .animation(.snappy(duration: 0.3), value: fraction)
+        .accessibilityHidden(true)
     }
 }
 

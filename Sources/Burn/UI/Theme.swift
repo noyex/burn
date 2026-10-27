@@ -28,31 +28,36 @@ struct Theme {
     static let lime = Color(hex: 0xDFF26B)
     static let limeInk = Color(hex: 0x1A1D06)
 
-    func fill(_ p: ProviderID) -> Color {
-        switch p {
-        case .claude: Color(hex: 0xD97757)
-        case .codex: dark ? Color(hex: 0xF2F1EE) : Color(hex: 0x141414)
-        case .cursor: Color(hex: 0xC9C5FF)
+    func fill(_ p: ProviderID) -> Color { fill(p.brandColor) }
+    func ink(_ p: ProviderID) -> Color { ink(p.brandColor) }
+
+    func fill(_ c: CardColor) -> Color {
+        switch c {
+        case .coral: Color(hex: 0xD97757)
+        case .mono: dark ? Color(hex: 0xF2F1EE) : Color(hex: 0x141414)
+        case .lavender: Color(hex: 0xC9C5FF)
+        case .sky: Color(hex: 0xB4DDF7)
         }
     }
 
-    func ink(_ p: ProviderID) -> Color {
-        switch p {
-        case .claude: .white
-        case .codex: dark ? Color(hex: 0x141414) : .white
-        case .cursor: Color(hex: 0x1B1840)
+    func ink(_ c: CardColor) -> Color {
+        switch c {
+        case .coral: .white
+        case .mono: dark ? Color(hex: 0x141414) : .white
+        case .lavender: Color(hex: 0x1B1840)
+        case .sky: Color(hex: 0x0C2C42)
         }
     }
 
     /// Alert text inside a pill filled with the block's ink, readable on light and dark ink alike.
-    func alert(_ level: MenuBarImage.Level, on p: ProviderID) -> Color {
-        let lightInk = switch p {
-        case .claude: true
-        case .codex: !dark
-        case .cursor: false
+    func alert(_ level: MenuBarImage.Level, on c: CardColor) -> Color {
+        let lightInk = switch c {
+        case .coral: true
+        case .mono: !dark
+        case .lavender, .sky: false
         }
         switch level {
-        case .normal: return ink(p)
+        case .normal: return ink(c)
         case .warn: return lightInk ? Color(hex: 0xC25E00) : Color(hex: 0xFFB340)
         case .full: return lightInk ? Color(hex: 0xD92D20) : Color(hex: 0xFF6B5E)
         }
@@ -63,6 +68,24 @@ struct Theme {
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             ? NSColor(srgbRed: 0x16 / 255, green: 0x15 / 255, blue: 0x14 / 255, alpha: 1)
             : NSColor(srgbRed: 0xF7 / 255, green: 0xF5 / 255, blue: 0xF2 / 255, alpha: 1)
+    }
+}
+
+/// Fill a provider card can take: the three brand colors and one extra.
+enum CardColor: String, CaseIterable, Identifiable {
+    case coral, mono, lavender, sky
+
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+}
+
+extension ProviderID {
+    var brandColor: CardColor {
+        switch self {
+        case .claude: .coral
+        case .codex: .mono
+        case .cursor: .lavender
+        }
     }
 }
 

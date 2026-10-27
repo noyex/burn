@@ -21,6 +21,11 @@ struct PopoverView: View {
     @State private var copiedShare = false
     @State private var hoveringShare = false
     @State private var resetTasks: [String: Task<Void, Never>] = [:]
+    @State private var cardFrames: [ProviderID: CGRect] = [:]
+    @State private var dragging: ProviderID?
+    @State private var dragLocation: CGPoint = .zero
+    @State private var grabOffset: CGSize = .zero
+    @State private var lastSwap: ProviderID?
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -42,9 +47,17 @@ struct PopoverView: View {
         let visible = model.popoverVisible
         ZStack(alignment: .topLeading) {
             if showingSettings {
-                SettingsView(model: model) { withAnimation(.snappy(duration: 0.25)) { showingSettings = false } }
-                    .block(theme.surface)
-                    .transition(tabTransition)
+                SettingsView(model: model) {
+                    withAnimation(.snappy(duration: 0.25)) { showingSettings = false }
+                } onArrange: {
+                    withAnimation(.snappy(duration: 0.25)) {
+                        showingSettings = false
+                        model.settings.tab = .usage
+                        model.editingPanel = true
+                    }
+                }
+                .block(theme.surface)
+                .transition(tabTransition)
             } else {
                 main.transition(tabTransition)
             }
@@ -99,6 +112,12 @@ struct PopoverView: View {
             // Pruned or cleared screenshots must not stay selected.
             selection.formIntersection(items.map(\.id))
         }
+        .onChange(of: settings.tab) { _, tab in
+            if tab != .usage { model.editingPanel = false }
+        }
+        .onChange(of: model.editingPanel) { _, editing in
+            if !editing { dragging = nil }
+        }
     }
 
     /// The new view settles in while the old one gets out of the way quickly, so they don't
@@ -118,44 +137,62 @@ struct PopoverView: View {
 
     // MARK: Usage
 
-    /// Providers with limits (or still loading) get colored blocks; the rest a compact row each.
-    private var blockProviders: [ProviderID] {
-        model.connected.filter { p in
-            switch model.limits[p] ?? .loading {
-            case .loading, .loaded: true
-            case .failed(_, let last): last != nil
-            case .signedOut: false
+    @ViewBuilder
+    private var usage: some View {
+        let visible = model.popoverVisible
+        let editing = model.editingPanel
+        let shown = model.panelProviders
+        let cards = shown.filter(model.hasCard)
+        let issues = shown.filter { !cards.contains($0) }
+        let sizes = model.settings.cardSizes(for: cards)
+        let rows = PanelArrangement.rows(cards, sizes: sizes)
+        if model.connected.isEmpty {
+            signIn.reveal(visible, index: 0)
+        } else {
+            if !cards.isEmpty {
+                CardGrid(rows: rows) {
+                    ForEach(cards) { p in
+                        card(p, size: sizes[p] ?? .m)
+                            .reveal(visible, index: rows.firstIndex { $0.contains(p) } ?? 0)
+                            .layoutValue(key: CardID.self, value: p)
+                    }
+                }
+                .coordinateSpace(name: Self.cardSpace)
+                .onPreferenceChange(CardFrameKey.self) { frames in
+                    MainActor.assumeIsolated { cardFrames = frames }
+                }
+                .overlay(alignment: .topLeading) { draggedCard(sizes: sizes) }
+                .zIndex(dragging == nil ? 0 : 1)
             }
+            ForEach(issues) { p in
+                ProviderIssueRow(provider: p, state: model.limits[p] ?? .loading)
+                    .allowsHitTesting(!editing)
+                    .editChrome(editing, title: p.name, size: nil) { hide(p) }
+                    .wiggle(editing, seed: seed(p), amplitude: 0.35)
+                    .reveal(visible, index: rows.count)
+            }
+        }
+        if model.settings.showsSpending {
+            spend
+                .allowsHitTesting(!editing)
+                .startsEditing { startEditing() }
+                .editChrome(editing, title: "Spent", size: nil) {
+                    withAnimation(.snappy(duration: 0.25)) { model.settings.showsSpending = false }
+                }
+                .wiggle(editing, seed: 5.3, amplitude: 0.35)
+                .reveal(visible, index: rows.count + 1)
+        }
+        if editing {
+            hiddenCards.transition(.opacity)
+        } else if !model.connected.isEmpty, shown.isEmpty, !spendShown {
+            emptyPanel.reveal(visible, index: 0)
         }
     }
 
     @ViewBuilder
-    private var usage: some View {
-        let visible = model.popoverVisible
-        if model.connected.isEmpty {
-            signIn.reveal(visible, index: 0)
-        } else {
-            let blocks = blockProviders
-            let issues = model.connected.filter { !blocks.contains($0) }
-            if let hero = blocks.first {
-                providerBlock(hero, hero: true).reveal(visible, index: 0)
-            }
-            let rest = Array(blocks.dropFirst())
-            ForEach(Array(stride(from: 0, to: rest.count, by: 2)), id: \.self) { i in
-                HStack(spacing: Bento.gap) {
-                    providerBlock(rest[i], hero: false)
-                    if i + 1 < rest.count { providerBlock(rest[i + 1], hero: false) }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .reveal(visible, index: 1 + i / 2)
-            }
-            ForEach(issues) { p in
-                ProviderIssueRow(provider: p, state: model.limits[p] ?? .loading)
-                    .reveal(visible, index: blocks.count)
-            }
-        }
+    private var spend: some View {
         if model.hasUsage {
-            SpendBlock(model: model).reveal(visible, index: 3)
+            SpendBlock(model: model)
         } else if let pct = model.importPercent {
             ProgressView(value: Double(pct), total: 100) {
                 Text("Importing usage from Claude Code and Codex logs…").font(.brand(11))
@@ -167,10 +204,138 @@ struct PopoverView: View {
         }
     }
 
-    private func providerBlock(_ p: ProviderID, hero: Bool) -> some View {
+    private var spendShown: Bool { model.settings.showsSpending && (model.hasUsage || model.importPercent != nil) }
+
+    private func card(_ p: ProviderID, size: CardSize) -> some View {
+        let editing = model.editingPanel
+        let lifted = dragging == p
+        return providerBlock(p, size: size)
+            .opacity(lifted ? 0 : 1)
+            // Keeps the gap visible and the drag's view hit-testable while the copy follows the pointer.
+            .background { if lifted { Bento.blockShape.fill(theme.text.opacity(0.06)) } }
+            .background {
+                GeometryReader { geo in
+                    Color.clear.preference(key: CardFrameKey.self, value: [p: geo.frame(in: .named(Self.cardSpace))])
+                }
+            }
+            .gesture(reorderGesture(p), including: editing ? .all : .subviews)
+            .startsEditing { startEditing() }
+            .editChrome(editing && !lifted, title: p.name, size: Binding(
+                get: { size },
+                set: { new in
+                    withAnimation(.snappy(duration: 0.25)) {
+                        model.settings.setCardSize(p, new, cards: model.cardProviders)
+                    }
+                })) { hide(p) }
+            .wiggle(editing && !lifted, seed: seed(p), amplitude: size == .m ? 0.6 : 0.35)
+    }
+
+    private func providerBlock(_ p: ProviderID, size: CardSize) -> some View {
         ProviderBlock(provider: p, state: model.limits[p] ?? .loading,
-                      primary: model.limits[p]?.limits.flatMap { model.menuBarWindow(for: $0) }, hero: hero)
+                      primary: model.limits[p]?.limits.flatMap { model.cardWindow(for: $0) },
+                      size: size, color: model.settings.cardColor(p))
             .frame(maxHeight: .infinity)
+    }
+
+    /// Different phases, so the cards don't rock in lockstep.
+    private func seed(_ p: ProviderID) -> Double { Double(ProviderID.allCases.firstIndex(of: p) ?? 0) * 1.9 }
+
+    // MARK: Editing
+
+    private static let cardSpace = "cards"
+
+    private func startEditing() {
+        guard !model.editingPanel else { return }
+        withAnimation(.snappy(duration: 0.25)) { model.editingPanel = true }
+    }
+
+    private func hide(_ p: ProviderID) {
+        withAnimation(.snappy(duration: 0.25)) { model.settings.setShowsInPanel(p, false) }
+    }
+
+    /// Follows the pointer with a copy of the card while the card itself leaves a gap that moves
+    /// to whichever card the pointer is over.
+    private func reorderGesture(_ p: ProviderID) -> some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .named(Self.cardSpace))
+            .onChanged { g in
+                if dragging != p {
+                    let frame = cardFrames[p] ?? .zero
+                    grabOffset = CGSize(width: g.startLocation.x - frame.minX, height: g.startLocation.y - frame.minY)
+                    lastSwap = nil
+                    withAnimation(.easeOut(duration: 0.12)) { dragging = p }
+                }
+                dragLocation = g.location
+                let cards = model.cardProviders
+                guard let target = cards.first(where: { $0 != p && cardFrames[$0]?.contains(g.location) == true }) else {
+                    lastSwap = nil
+                    return
+                }
+                // Once per card entered, so a card that changes size on the move can't flip back and forth.
+                guard target != lastSwap, let from = cards.firstIndex(of: p), let to = cards.firstIndex(of: target) else { return }
+                lastSwap = target
+                var next = cards
+                next.move(fromOffsets: [from], toOffset: to > from ? to + 1 : to)
+                withAnimation(.snappy(duration: 0.25)) { model.settings.reorder(next) }
+            }
+            .onEnded { _ in
+                withAnimation(.snappy(duration: 0.25)) { dragging = nil }
+            }
+    }
+
+    @ViewBuilder
+    private func draggedCard(sizes: [ProviderID: CardSize]) -> some View {
+        if let p = dragging, let frame = cardFrames[p] {
+            providerBlock(p, size: sizes[p] ?? .m)
+                .frame(width: frame.width, height: frame.height)
+                .scaleEffect(1.03)
+                .offset(x: dragLocation.x - grabOffset.width, y: dragLocation.y - grabOffset.height)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+        }
+    }
+
+    /// What's hidden from the panel, each one a button that brings it back.
+    @ViewBuilder
+    private var hiddenCards: some View {
+        let providers = model.settings.providerOrder.filter { model.connected.contains($0) && !model.settings.showsInPanel($0) }
+        if !providers.isEmpty || !model.settings.showsSpending {
+            HStack(spacing: Bento.gap) {
+                ForEach(providers) { p in
+                    addButton(p.name) { model.settings.setShowsInPanel(p, true) }
+                }
+                if !model.settings.showsSpending {
+                    addButton("Spent") { model.settings.showsSpending = true }
+                }
+            }
+        }
+    }
+
+    private func addButton(_ title: String, _ action: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(.snappy(duration: 0.25)) { action() }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "plus").font(.system(size: 10, weight: .bold))
+                Text(title).font(.brand(12, .bold))
+            }
+            .padding(.horizontal, 11)
+            .frame(height: 28)
+            .floating(theme.surface, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityLabel("Show \(title)")
+    }
+
+    private var emptyPanel: some View {
+        VStack(spacing: 10) {
+            Text("Everything is hidden from the panel").font(.brand(12)).foregroundStyle(theme.secondary)
+            Button("Edit panel") { startEditing() }
+                .buttonStyle(PillButtonStyle(prominent: true))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .block(theme.neutral)
     }
 
     private var signIn: some View {
@@ -192,24 +357,36 @@ struct PopoverView: View {
 
     private var footer: some View {
         let onUsage = model.settings.tab == .usage
+        let editing = model.editingPanel
         return HStack(spacing: Bento.gap) {
-            // Both rows stay in the tree and crossfade: a row that was inserted or removed would
+            // The rows stay in the tree and crossfade: a row that was inserted or removed would
             // not ride along while the footer slides to the other tab's height.
             ZStack(alignment: .leading) {
                 HStack(spacing: Bento.gap) {
                     syncStatus
                     if let usage = model.usage, usage.cost > 0 { shareButton(usage) }
                 }
-                .footerRow(shown: onUsage)
+                .footerRow(shown: onUsage && !editing)
                 HStack(spacing: Bento.gap) { shelfActions }
                     .footerRow(shown: !onUsage)
+                HStack(spacing: Bento.gap) {
+                    Text("Drag to reorder").foregroundStyle(theme.secondary).padding(.leading, 8)
+                    Spacer()
+                    Button("Done") { withAnimation(.snappy(duration: 0.25)) { model.editingPanel = false } }
+                        .buttonStyle(PillButtonStyle(prominent: true))
+                        .keyboardShortcut(.defaultAction)
+                }
+                .footerRow(shown: onUsage && editing)
             }
             if let release = updateShown {
                 updateButton(release)
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9)))
             }
-            RoundIconButton(systemName: "gearshape", label: "Settings") {
-                withAnimation(.snappy(duration: 0.25)) { showingSettings = true }
+            if !editing {
+                RoundIconButton(systemName: "gearshape", label: "Settings") {
+                    withAnimation(.snappy(duration: 0.25)) { showingSettings = true }
+                }
+                .transition(.opacity)
             }
         }
         .font(.brand(11))
@@ -218,9 +395,10 @@ struct PopoverView: View {
         .animation(.easeOut(duration: 0.2), value: updateShown)
     }
 
-    /// Kept out of the way while screenshots are selected, the footer is full then.
+    /// Kept out of the way while screenshots are selected or cards are arranged, the footer is full then.
     private var updateShown: Updater.Release? {
-        model.settings.tab == .usage || selection.isEmpty ? model.updater.available : nil
+        guard !model.editingPanel else { return nil }
+        return model.settings.tab == .usage || selection.isEmpty ? model.updater.available : nil
     }
 
     private func updateButton(_ release: Updater.Release) -> some View {
