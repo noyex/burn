@@ -25,7 +25,15 @@ final class StatusItemController: NSObject {
         host.view.wantsLayer = true
         host.view.layer?.backgroundColor = .clear
         panel.contentView = host.view
-        panel.onCancel = { [weak self] in self?.close() }
+        panel.onCancel = { [weak self] in
+            guard let self else { return }
+            // Escape leaves editing first, a second one closes the panel.
+            if model.editingPanel {
+                withAnimation(.snappy(duration: 0.25)) { self.model.editingPanel = false }
+            } else {
+                close()
+            }
+        }
 
         item.button?.target = self
         item.button?.action = #selector(toggle)
@@ -81,6 +89,7 @@ final class StatusItemController: NSObject {
                 guard let self, self.generation == current else { return }
                 self.panel.orderOut(nil)
                 self.model.popoverVisible = false
+                self.model.editingPanel = false
             }
         }
     }

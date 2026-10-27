@@ -3,11 +3,38 @@ import SwiftUI
 struct SettingsView: View {
     let model: AppModel
     let onBack: () -> Void
+    /// Closes settings and starts editing the panel.
+    let onArrange: () -> Void
+    @State private var provider: ProviderID?
+    @State private var draggedRow: ProviderID?
+    @State private var dragStart = 0
+    @State private var dragTranslation: CGFloat = 0
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var theme: Theme { Theme(scheme) }
+    /// A row plus the divider under it.
+    private static let rowPitch: CGFloat = 33
 
     var body: some View {
+        ZStack(alignment: .topLeading) {
+            if let provider {
+                ProviderSettingsView(model: model, provider: provider) {
+                    withAnimation(.snappy(duration: 0.25)) { self.provider = nil }
+                }
+                .transition(pageTransition)
+            } else {
+                list.transition(pageTransition)
+            }
+        }
+    }
+
+    private var pageTransition: AnyTransition {
+        .asymmetric(insertion: reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98, anchor: .top)),
+                    removal: .opacity.animation(.easeOut(duration: 0.12)))
+    }
+
+    private var list: some View {
         VStack(alignment: .leading, spacing: Bento.gap) {
             HStack(spacing: 10) {
                 RoundIconButton(systemName: "chevron.left", label: "Back", action: onBack)
@@ -15,26 +42,32 @@ struct SettingsView: View {
             }
             .padding(.bottom, 4)
 
+            SettingsSectionTitle("PANEL")
+            SettingsGroup { panelRows }
+
+            SettingsSectionTitle("PROVIDERS")
+            SettingsGroup {
+                let order = model.orderedProviders
+                ForEach(Array(order.enumerated()), id: \.element) { i, p in
+                    if i > 0 { Divider().opacity(0.6) }
+                    providerListRow(p)
+                        .offset(y: draggedRow == p ? dragTranslation - CGFloat(i - dragStart) * Self.rowPitch : 0)
+                        .zIndex(draggedRow == p ? 1 : 0)
+                }
+            }
+
             if !model.connected.isEmpty {
-                sectionTitle("MENU BAR")
-                group {
+                SettingsSectionTitle("MENU BAR")
+                SettingsGroup {
                     ForEach(Array(model.connected.enumerated()), id: \.element) { i, p in
                         if i > 0 { Divider().opacity(0.6) }
-                        providerRow(p)
+                        menuBarRow(p)
                     }
                 }
             }
 
-            sectionTitle("ACCOUNTS")
-            group {
-                ForEach(Array(ProviderID.allCases.enumerated()), id: \.element) { i, p in
-                    if i > 0 { Divider().opacity(0.6) }
-                    accountRow(p)
-                }
-            }
-
-            sectionTitle("SHELF")
-            group {
+            SettingsSectionTitle("SHELF")
+            SettingsGroup {
                 HStack {
                     Text("Keep screenshots")
                     Spacer()
@@ -54,7 +87,7 @@ struct SettingsView: View {
                 .frame(height: 32)
             }
 
-            group {
+            SettingsGroup {
                 HStack {
                     Text("Launch at login")
                     Spacer()
@@ -81,42 +114,127 @@ struct SettingsView: View {
         }
     }
 
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title).font(.brand(10, .bold)).kerning(0.4).foregroundStyle(theme.secondary)
-            .padding(.leading, 4)
-            .padding(.top, 6)
-    }
-
-    private func group(@ViewBuilder _ content: () -> some View) -> some View {
-        VStack(spacing: 0) { content() }
-            .font(.brand(12))
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity)
-            .background(theme.neutral, in: Bento.blockShape)
-    }
-
     @ViewBuilder
-    private func accountRow(_ p: ProviderID) -> some View {
-        let signedIn: Bool = {
-            guard model.connected.contains(p) else { return false }
-            if case .signedOut = model.limits[p] { return false }
-            return true
-        }()
-        HStack(spacing: 8) {
-            ProviderGlyph(provider: p, color: theme.text)
-            Text(p.name)
+    private var panelRows: some View {
+        @Bindable var settings = model.settings
+        HStack {
+            Text("Layout")
             Spacer()
-            if signedIn {
-                Text("Signed in").font(.brand(11)).foregroundStyle(theme.secondary)
-            } else {
-                CommandChip(command: p.loginCommand)
-            }
+            PillSegmented(options: PanelLayout.allCases, selection: $settings.panelLayout,
+                          style: .segmented(theme), compact: true, accessibilityLabel: "Layout") { $0.title }
         }
         .frame(height: 32)
+        Divider().opacity(0.6)
+        HStack {
+            Text("Order")
+            Spacer()
+            Picker("Order", selection: $settings.panelOrder) {
+                ForEach(PanelOrder.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+            .controlSize(.small)
+        }
+        .frame(height: 32)
+        Divider().opacity(0.6)
+        HStack {
+            Text("Show spending")
+            Spacer()
+            Toggle("Show spending", isOn: $settings.showsSpending)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+        }
+        .frame(height: 32)
+        Divider().opacity(0.6)
+        Button(action: onArrange) {
+            HStack {
+                Text("Arrange in panel…")
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(theme.secondary)
+            }
+            .frame(height: 32)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func providerListRow(_ p: ProviderID) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(theme.secondary)
+                .frame(width: 16, height: 32)
+                .contentShape(Rectangle())
+                .gesture(rowDrag(p))
+                .hoverTip("Drag to reorder")
+                .accessibilityLabel("Reorder \(p.name)")
+            HStack(spacing: 8) {
+                ProviderGlyph(provider: p, color: theme.text)
+                Text(p.name)
+                Text(plan(p)).font(.brand(11)).foregroundStyle(theme.secondary).lineLimit(1)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { open(p) }
+            Toggle("Show \(p.name) in panel", isOn: Binding(
+                get: { model.settings.showsInPanel(p) },
+                set: { model.settings.setShowsInPanel(p, $0) }))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            Button { open(p) } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(theme.secondary)
+                    .frame(width: 16, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(p.name) settings")
+        }
+        .frame(height: 32)
+        .background(theme.neutral)
+    }
+
+    private func plan(_ p: ProviderID) -> String {
+        guard model.connected.contains(p) else { return "Not signed in" }
+        if case .signedOut = model.limits[p] { return "Signed out" }
+        return model.limits[p]?.limits?.plan ?? ""
+    }
+
+    private func open(_ p: ProviderID) {
+        withAnimation(.snappy(duration: 0.25)) { provider = p }
+    }
+
+    /// Moves the row to wherever it's dragged; the order is saved as it changes.
+    private func rowDrag(_ p: ProviderID) -> some Gesture {
+        DragGesture(minimumDistance: 2)
+            .onChanged { g in
+                let order = model.orderedProviders
+                guard let current = order.firstIndex(of: p) else { return }
+                if draggedRow != p {
+                    draggedRow = p
+                    dragStart = current
+                }
+                dragTranslation = g.translation.height
+                let target = min(max(dragStart + Int((g.translation.height / Self.rowPitch).rounded()), 0), order.count - 1)
+                guard target != current else { return }
+                var next = order
+                next.move(fromOffsets: [current], toOffset: target > current ? target + 1 : target)
+                withAnimation(.snappy(duration: 0.2)) { model.settings.reorder(next) }
+            }
+            .onEnded { _ in
+                withAnimation(.snappy(duration: 0.2)) {
+                    draggedRow = nil
+                    dragTranslation = 0
+                }
+            }
     }
 
     @ViewBuilder
-    private func providerRow(_ p: ProviderID) -> some View {
+    private func menuBarRow(_ p: ProviderID) -> some View {
         let windows = model.limits[p]?.limits?.windows ?? []
         HStack(spacing: 8) {
             ProviderGlyph(provider: p, color: theme.text)
@@ -145,5 +263,39 @@ struct SettingsView: View {
                 .controlSize(.small)
         }
         .frame(height: 32)
+    }
+}
+
+struct SettingsSectionTitle: View {
+    let title: String
+    @Environment(\.colorScheme) private var scheme
+
+    init(_ title: String) { self.title = title }
+
+    var body: some View {
+        Text(title).font(.brand(10, .bold)).kerning(0.4).foregroundStyle(Theme(scheme).secondary)
+            .padding(.leading, 4)
+            .padding(.top, 6)
+    }
+}
+
+/// Rows on one neutral block.
+struct SettingsGroup<Content: View>: View {
+    @ViewBuilder let content: Content
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        VStack(spacing: 0) { content }
+            .font(.brand(12))
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity)
+            .background(Theme(scheme).neutral, in: Bento.blockShape)
+    }
+}
+
+extension PillSegmented.Style {
+    /// A raised pill on a neutral settings row.
+    @MainActor static func segmented(_ theme: Theme) -> Self {
+        .init(track: theme.text.opacity(0.06), selected: theme.raised, selectedText: theme.text, text: theme.secondary)
     }
 }

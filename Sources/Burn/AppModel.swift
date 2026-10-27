@@ -35,6 +35,8 @@ final class AppModel {
     private(set) var usageError: String?
     /// False while the popover is closed, so its content can animate in on every open.
     var popoverVisible = true
+    /// Cards wiggle and can be dragged, hidden or resized. Ends when the panel closes.
+    var editingPanel = false
 
     var period: Period = .all {
         didSet { if period != oldValue { Task { await loadUsage() } } }
@@ -97,14 +99,53 @@ final class AppModel {
     }
 
     func menuBarWindow(for limits: ProviderLimits) -> LimitWindow? {
-        let choice = settings.menuBarWindow(limits.provider)
+        Self.window(settings.menuBarWindow(limits.provider), in: limits)
+    }
+
+    func settingsChanged() { onMenuBarChange?() }
+
+    // MARK: Panel
+
+    /// Window shown big on the provider's card.
+    func cardWindow(for limits: ProviderLimits) -> LimitWindow? {
+        Self.window(settings.cardWindow(limits.provider), in: limits)
+    }
+
+    private static func window(_ choice: String, in limits: ProviderLimits) -> LimitWindow? {
         if choice != Settings.highest, let w = limits.windows.first(where: { $0.id == choice }) {
             return w
         }
         return limits.windows.max { $0.percent < $1.percent }
     }
 
-    func settingsChanged() { onMenuBarChange?() }
+    /// Every provider in the panel's order, hidden and signed out ones included.
+    var orderedProviders: [ProviderID] {
+        guard settings.panelOrder == .closestToLimit else { return settings.providerOrder }
+        return PanelArrangement.closestToLimit(settings.providerOrder) { p in
+            limits[p]?.limits.flatMap(cardWindow).map { 100 - $0.percent }
+        }
+    }
+
+    /// Connected providers shown in the panel, in order.
+    var panelProviders: [ProviderID] {
+        orderedProviders.filter { connected.contains($0) && settings.showsInPanel($0) }
+    }
+
+    /// Shown providers that get a card; the rest get a compact row about signing in or the error.
+    var cardProviders: [ProviderID] { panelProviders.filter(hasCard) }
+
+    func hasCard(_ p: ProviderID) -> Bool {
+        switch limits[p] ?? .loading {
+        case .loading, .loaded: true
+        case .failed(_, let last): last != nil
+        case .signedOut: false
+        }
+    }
+
+    /// Size the provider's card has right now, or would have in Custom when it isn't shown.
+    func cardSize(_ p: ProviderID) -> CardSize {
+        settings.cardSizes(for: cardProviders)[p] ?? settings.customSize(p)
+    }
 
     // MARK: Loading
 
