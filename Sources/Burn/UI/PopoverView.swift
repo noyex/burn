@@ -225,11 +225,11 @@ private struct LimitRow: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(.quaternary)
                     Capsule().fill(barColor)
-                        .frame(width: geo.size.width * min(max(window.percent, 0), 100) / 100)
+                        .frame(width: geo.size.width * min(max(100 - window.percent, 0), 100) / 100)
                 }
             }
             .frame(height: 6)
-            Text(Format.percent(window.percent))
+            Text(Format.remaining(window.percent))
                 .fontWeight(emphasized ? .semibold : .regular)
                 .foregroundStyle(level == .normal ? AnyShapeStyle(.primary) : AnyShapeStyle(barColor))
                 .frame(width: 40, alignment: .trailing)
@@ -242,7 +242,7 @@ private struct LimitRow: View {
         .frame(height: 20)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(window.label) limit")
-        .accessibilityValue("\(Format.percent(window.percent)) used, resets \(Format.reset(window.resetsAt))")
+        .accessibilityValue("\(Format.remaining(window.percent)) left, resets \(Format.reset(window.resetsAt))")
     }
 }
 
