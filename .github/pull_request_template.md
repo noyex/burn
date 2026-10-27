@@ -16,7 +16,7 @@ Not a UI change? Write "No UI change".
 
 ## Checklist
 
-- [ ] `swift build` passes and I ran the app (`scripts/build-app.sh --install`)
+- [ ] `scripts/build-app.sh --universal` builds and I ran the app with my change (`scripts/build-app.sh --install`)
 - [ ] The PR title follows Conventional Commits (`feat: …`, `fix: …`, `refactor: …`)
 - [ ] UI changes have screenshots or a video above
 - [ ] No new network requests, or I explained above where they go and why

@@ -32,7 +32,8 @@ jobs:
           BODY: ${{ github.event.pull_request.body }}
           NO_UI: ${{ contains(github.event.pull_request.labels.*.name, 'no-ui') }}
         run: |
-          ui_files="$(gh pr diff "$PR" --repo "$REPO" --name-only | grep -E '^(Sources/Burn/UI/|assets/|docs/screenshot)' || true)"
+          files="$(gh pr diff "$PR" --repo "$REPO" --name-only)"
+          ui_files="$(grep -E '^(Sources/Burn/UI/|Sources/Burn/Shelf/|assets/|docs/screenshot)' <<<"$files" || true)"
           if [[ -z "$ui_files" ]]; then
             echo "No UI files changed."
             exit 0
@@ -41,7 +42,7 @@ jobs:
             echo "UI files changed, but the PR is labeled no-ui."
             exit 0
           fi
-          if grep -qiE '!\[|<img|<video|github\.com/user-attachments/|\.(png|jpe?g|gif|webp|mov|mp4)' <<<"$BODY"; then
+          if grep -qiE '!\[[^]]*\]\([^)]+\)|<img|<video|github\.com/user-attachments/' <<<"$BODY"; then
             echo "Found a screenshot or video in the description."
             exit 0
           fi

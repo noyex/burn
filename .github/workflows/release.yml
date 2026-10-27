@@ -30,22 +30,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # tags for the version, full history for the build number
+          persist-credentials: false
 
-      - name: Tag
+      - name: Tag locally
         run: |
           if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
             echo "::error::$TAG already exists"
             exit 1
           fi
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          # The build reads the version from the latest tag.
-          git tag -a "$TAG" -m "Burn $TAG"
+          latest="$(git tag --list 'v*' --sort=-v:refname | head -1)"
+          if [[ -n "$latest" && "$(printf '%s\n' "$latest" "$TAG" | sort -V | tail -1)" != "$TAG" ]]; then
+            echo "::error::$TAG must be newer than $latest"
+            exit 1
+          fi
+          # The build reads the version from the latest tag. The release step creates the real tag on GitHub,
+          # so a failed build leaves nothing behind.
+          git tag "$TAG"
 
       - name: Build Burn.dmg and Burn.zip
         run: scripts/package.sh
 
       - name: Publish
         run: |
-          git push origin "$TAG"
-          gh release create "$TAG" dist/Burn.dmg dist/Burn.zip --title "Burn $TAG" --generate-notes
+          gh release create "$TAG" dist/Burn.dmg dist/Burn.zip --target "$GITHUB_SHA" --title "Burn $TAG" --generate-notes

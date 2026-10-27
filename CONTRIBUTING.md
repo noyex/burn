@@ -34,7 +34,7 @@ for example `fix: show Codex limits after the token rotates`.
 If you change something that already exists, show it before and after. Light and dark mode both matter
 when you touch colors.
 
-A check enforces this: PRs that touch `Sources/Burn/UI/`, `assets/` or `docs/screenshot.png` fail
+A check enforces this: PRs that touch `Sources/Burn/UI/`, `Sources/Burn/Shelf/`, `assets/` or `docs/screenshot.png` fail
 until the description has an image or video. If you only refactored UI code and nothing visible changed,
 say so in the description and a maintainer will add the `no-ui` label.
 
