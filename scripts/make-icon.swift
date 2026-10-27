@@ -4,7 +4,7 @@ import CoreText
 
 let out = CommandLine.arguments[1]
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-let fontURL = root.appendingPathComponent("assets/fonts/BricolageGrotesque-Display-ExtraBold.ttf")
+let fontURL = root.appendingPathComponent("assets/Fonts/BricolageGrotesque96pt-ExtraBold.ttf")
 CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
 
 let iconset = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Burn.iconset")
