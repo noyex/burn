@@ -11,6 +11,13 @@ enum PopoverTab: String, CaseIterable {
         case .shelf: "Shelf"
         }
     }
+
+    var symbol: String {
+        switch self {
+        case .usage: "gauge.with.dots.needle.50percent"
+        case .shelf: "photo.stack"
+        }
+    }
 }
 
 /// User preferences, persisted in UserDefaults.

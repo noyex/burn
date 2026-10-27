@@ -27,6 +27,7 @@ enum BurnMain {
             RunLoop.main.run()
             return
         }
+        BrandFont.register()
         let app = NSApplication.shared
         let delegate = AppDelegate()
         self.delegate = delegate
@@ -62,6 +63,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.styleMask = [.titled, .fullSizeContentView]
         window.title = "Burn"
         window.titlebarAppearsTransparent = true
+        window.backgroundColor = Theme.baseNSColor
+        if CommandLine.arguments.contains("--dark") { window.appearance = NSAppearance(named: .darkAqua) }
+        if CommandLine.arguments.contains("--light") { window.appearance = NSAppearance(named: .aqua) }
         window.setFrameTopLeftPoint(NSPoint(x: -3000, y: 1000))
         window.orderFrontRegardless()
         return window

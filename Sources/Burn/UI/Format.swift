@@ -25,6 +25,9 @@ enum Format {
 
     static func percent(_ v: Double) -> String { "\(Int(v.rounded()))%" }
 
+    /// Share of a limit still left, from its used percent.
+    static func remaining(_ used: Double) -> String { percent(min(max(100 - used, 0), 100)) }
+
     /// "2h 10m" within a day, weekday within a week, otherwise "1 Nov".
     static func reset(_ date: Date?, now: Date = .now) -> String {
         guard let date else { return "" }

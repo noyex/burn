@@ -8,26 +8,30 @@ struct ShelfView: View {
     let columns: Int
     let maxHeight: CGFloat
     @Binding var selection: Set<URL>
+    @Environment(\.colorScheme) private var scheme
 
     private let spacing: CGFloat = 8
+    /// Scroll content reaches past the grid so tile shadows aren't clipped.
+    private let inset = Bento.shadowInset
     private var tileWidth: CGFloat { (width - spacing * CGFloat(columns - 1)) / CGFloat(columns) }
     private var tileHeight: CGFloat { (tileWidth * 0.625).rounded() }
 
     var body: some View {
         if shelf.items.isEmpty {
             VStack(spacing: 6) {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 26, weight: .light))
-                    .foregroundStyle(.tertiary)
+                Image(systemName: "photo.stack")
+                    .font(.system(size: 24, weight: .medium))
+                    .padding(.bottom, 4)
                 Text("Screenshots you copy show up here")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .font(.brand(13, .bold))
                 Text("⌃⇧⌘4")
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.tertiary)
+                    .font(.brand(12))
+                    .opacity(0.6)
             }
+            .foregroundStyle(Theme.limeInk)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 36)
+            .floating(Theme.lime, in: Bento.blockShape)
         } else {
             let rows = (shelf.items.count + columns - 1) / columns
             let contentHeight = CGFloat(rows) * (tileHeight + spacing) - spacing
@@ -41,9 +45,13 @@ struct ShelfView: View {
                                   actions: actions(for: item))
                     }
                 }
+                .padding(inset)
             }
             .scrollIndicators(.never)
-            .frame(width: width, height: min(contentHeight, maxHeight))
+            .frame(width: width + inset.leading + inset.trailing,
+                   height: min(contentHeight, maxHeight) + inset.top + inset.bottom)
+            .padding(EdgeInsets(top: -inset.top, leading: -inset.leading,
+                                bottom: -inset.bottom, trailing: -inset.trailing))
         }
     }
 
@@ -91,9 +99,10 @@ private struct ShelfTile: View {
     @State private var hovering = false
     @State private var copied = false
     @State private var copiedReset: Task<Void, Never>?
+    @Environment(\.colorScheme) private var scheme
 
     private static let checkbox: CGFloat = 26
-    private let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+    private let shape = Bento.blockShape
 
     var body: some View {
         ZStack {
@@ -104,7 +113,7 @@ private struct ShelfTile: View {
                     .scaledToFill()
                     .frame(width: size.width, height: size.height)
             } else {
-                Rectangle().fill(.quinary)
+                Rectangle().fill(.quaternary)
             }
             if copied {
                 Label("Copied", systemImage: "checkmark")
@@ -117,6 +126,7 @@ private struct ShelfTile: View {
         }
         .frame(width: size.width, height: size.height)
         .clipShape(shape)
+        .floating(Theme(scheme).neutral, in: shape)
         .overlay {
             shape.strokeBorder(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.white.opacity(0.12)),
                                lineWidth: selected ? 2.5 : 0.5)
