@@ -9,13 +9,18 @@ struct PopoverView: View {
     @State private var copiedShare = false
     @State private var hoveringShare = false
     @State private var resetTasks: [String: Task<Void, Never>] = [:]
+    /// Natural height of each tab's content, so the area between header and footer can glide
+    /// between them instead of snapping when the outgoing tab is removed.
+    @State private var tabHeights: [PopoverTab: CGFloat] = [:]
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var theme: Theme { Theme(scheme) }
-    private var expanded: Bool { !showingSettings && model.settings.tab == .shelf && model.settings.shelfExpanded }
+    private static let usageWidth: CGFloat = 304
+    /// Doesn't depend on the tab, so the shelf keeps its grid while it fades out.
+    private var shelfWidth: CGFloat { model.settings.shelfExpanded ? 644 : 304 }
     /// Width of the blocks; the panel adds room for their shadows around it.
-    private var width: CGFloat { expanded ? 644 : 304 }
+    private var width: CGFloat { !showingSettings && model.settings.tab == .shelf ? shelfWidth : Self.usageWidth }
 
     var body: some View {
         let visible = model.popoverVisible
@@ -32,6 +37,8 @@ struct PopoverView: View {
         // fall through to the window below and close the panel.
         .background(Color.black.opacity(0.001))
         .padding(Bento.shadowInset)
+        // Pinned to the top, so the content stays put while the panel is still taller than it.
+        .frame(maxHeight: .infinity, alignment: .top)
         .foregroundStyle(theme.text)
         // Grows out of the menu bar icon; only animates in, the panel fades itself out.
         .scaleEffect(visible || reduceMotion ? 1 : 0.96, anchor: .top)
@@ -53,14 +60,17 @@ struct PopoverView: View {
                 switch settings.tab {
                 case .usage:
                     VStack(alignment: .leading, spacing: Bento.gap) { usage }
-                        .transition(tabTransition)
+                        .frame(width: Self.usageWidth)
+                        .modifier(TabContent(tab: .usage, heights: $tabHeights, transition: tabTransition))
                 case .shelf:
-                    ShelfView(shelf: model.shelf, width: width,
-                              columns: expanded ? 4 : 2, maxHeight: expanded ? 560 : 380,
+                    ShelfView(shelf: model.shelf, width: shelfWidth,
+                              columns: settings.shelfExpanded ? 4 : 2, maxHeight: settings.shelfExpanded ? 560 : 380,
                               selection: $selection)
-                        .transition(tabTransition)
+                        .modifier(TabContent(tab: .shelf, heights: $tabHeights, transition: tabTransition))
                 }
             }
+            // The outgoing tab may overflow while it fades; the footer draws over it.
+            .frame(width: width, height: tabHeights[settings.tab], alignment: .top)
             footer.padding(.top, 2)
         }
         .onChange(of: model.shelf.items) { _, items in
@@ -69,8 +79,11 @@ struct PopoverView: View {
         }
     }
 
+    /// The new tab settles in while the old one gets out of the way quickly, so they don't
+    /// pile up on each other.
     private var tabTransition: AnyTransition {
-        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97, anchor: .top))
+        .asymmetric(insertion: reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98, anchor: .top)),
+                    removal: .opacity.animation(.easeOut(duration: 0.12)))
     }
 
     private var expandButton: some View {
@@ -255,5 +268,23 @@ struct PopoverView: View {
             try? await Task.sleep(for: .seconds(seconds))
             if !Task.isCancelled { reset() }
         }
+    }
+}
+
+/// Reports a tab's natural height, animating changes so the frame around it follows smoothly.
+private struct TabContent: ViewModifier {
+    let tab: PopoverTab
+    @Binding var heights: [PopoverTab: CGFloat]
+    let transition: AnyTransition
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                guard heights[tab] != height else { return }
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) { heights[tab] = height }
+            }
+            .transition(transition)
     }
 }

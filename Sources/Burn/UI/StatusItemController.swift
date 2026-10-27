@@ -100,13 +100,13 @@ final class StatusItemController: NSObject {
         workspaceObservers = []
     }
 
-    /// Grows the panel at once. A narrower panel slides along with SwiftUI's animation, so the
+    /// Grows the panel at once. A change in width slides along with SwiftUI's animation, so the
     /// content doesn't snap sideways when it re-centers under the icon; a shorter one shrinks only
-    /// after the content has animated down, so it isn't clipped mid-animation.
+    /// after the content has animated up, so it isn't clipped mid-animation.
     private func resize() {
         pendingShrink?.cancel()
         let size = contentSize
-        if size.width < panel.frame.width {
+        if size.width != panel.frame.width {
             return place(animated: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
         }
         guard size.height < panel.frame.height else { return place() }

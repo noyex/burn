@@ -95,6 +95,7 @@ private struct ShelfTile: View {
     let selecting: Bool
     let actions: Actions
 
+    /// Starts from the cache, so reopening the shelf doesn't flash empty tiles.
     @State private var image: NSImage?
     @State private var hovering = false
     @State private var copied = false
@@ -103,6 +104,15 @@ private struct ShelfTile: View {
 
     private static let checkbox: CGFloat = 26
     private let shape = Bento.blockShape
+
+    init(item: ShelfItem, size: CGSize, selected: Bool, selecting: Bool, actions: Actions) {
+        self.item = item
+        self.size = size
+        self.selected = selected
+        self.selecting = selecting
+        self.actions = actions
+        _image = State(initialValue: Thumbnails.cached(item.url))
+    }
 
     var body: some View {
         ZStack {
