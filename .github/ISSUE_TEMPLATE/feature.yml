@@ -1,0 +1,15 @@
+name: Feature request
+description: Suggest an idea for Burn
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+      description: A sketch or screenshot of something similar is welcome.

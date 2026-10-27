@@ -1,0 +1,55 @@
+name: Release
+
+# Actions → Release → Run workflow, or: gh workflow run release.yml -f version=v1.2.3
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, e.g. v1.2.3
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      TAG: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check the version and branch
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Version must look like v1.2.3, got: $TAG"; exit 1; }
+          [[ "$GITHUB_REF" == refs/heads/main ]] || { echo "::error::Run the release from main"; exit 1; }
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # tags for the version, full history for the build number
+          persist-credentials: false
+
+      - name: Tag locally
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::$TAG already exists"
+            exit 1
+          fi
+          latest="$(git tag --list 'v*' --sort=-v:refname | head -1)"
+          if [[ -n "$latest" && "$(printf '%s\n' "$latest" "$TAG" | sort -V | tail -1)" != "$TAG" ]]; then
+            echo "::error::$TAG must be newer than $latest"
+            exit 1
+          fi
+          # The build reads the version from the latest tag. The release step creates the real tag on GitHub,
+          # so a failed build leaves nothing behind.
+          git tag "$TAG"
+
+      - name: Build Burn.dmg and Burn.zip
+        run: scripts/package.sh
+
+      - name: Publish
+        run: |
+          gh release create "$TAG" dist/Burn.dmg dist/Burn.zip --target "$GITHUB_SHA" --title "Burn $TAG" --generate-notes
