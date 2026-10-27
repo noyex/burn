@@ -137,12 +137,14 @@ final class StatusItemController: NSObject {
         layout(window: targetFrame, content: targetFrame)
     }
 
-    /// Sets the panel to `window` and centers the content on where it belongs (`content`),
-    /// top aligned, wide enough to cover the whole panel while it animates.
+    /// Sets the panel to `window` and hangs the content from its top, centered on where it
+    /// belongs (`content`). The hosting view is exactly as tall as the content, so SwiftUI
+    /// doesn't center it vertically, and wide enough to cover the panel while it animates.
     private func layout(window frame: NSRect, content target: NSRect) {
         if panel.frame != frame { panel.setFrame(frame, display: true) }
         let half = max(target.midX - frame.minX, frame.maxX - target.midX)
-        host.view.frame = NSRect(x: target.midX - frame.minX - half, y: 0, width: half * 2, height: frame.height)
+        host.view.frame = NSRect(x: target.midX - frame.minX - half, y: frame.height - target.height,
+                                 width: half * 2, height: target.height)
     }
 
     private func render() {

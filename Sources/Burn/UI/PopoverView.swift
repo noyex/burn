@@ -37,9 +37,6 @@ struct PopoverView: View {
         .scaleEffect(visible || reduceMotion ? 1 : 0.96, anchor: .top)
         .opacity(visible ? 1 : 0)
         .animation(visible ? .easeOut(duration: 0.2) : nil, value: visible)
-        // The panel can be bigger than the content while it resizes; keep the content
-        // hanging from the top instead of drifting to the middle.
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var main: some View {
