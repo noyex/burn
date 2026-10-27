@@ -11,7 +11,10 @@ TAG="${1:?usage: scripts/release.sh vX.Y.Z}"
 git fetch -q origin main
 [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] || { echo "main is not up to date with origin" >&2; exit 1; }
 
+# The build reads the version from the tag, so tag first and drop the tag again if anything fails.
 git tag -a "$TAG" -m "Burn $TAG"
+trap 'git tag -d "$TAG" >/dev/null' ERR
 scripts/package.sh
 git push -q origin "$TAG"
+trap - ERR
 gh release create "$TAG" dist/Burn.dmg dist/Burn.zip --title "Burn $TAG" --generate-notes
