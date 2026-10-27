@@ -50,8 +50,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             statusItem = StatusItemController(model: model)
         }
-        // A preview next to the installed app would save every copied image twice.
-        model.start(capturingClipboard: !preview)
+        // A preview next to the installed app would save every copied image twice,
+        // and updating it would replace the build it runs from.
+        model.start(capturingClipboard: !preview, checkingUpdates: !preview)
     }
 
     /// Development aid: the popover content in a plain off-screen window that stays open,

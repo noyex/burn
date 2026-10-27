@@ -203,6 +203,10 @@ struct PopoverView: View {
                 HStack(spacing: Bento.gap) { shelfActions }
                     .footerRow(shown: !onUsage)
             }
+            if let release = updateShown {
+                updateButton(release)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9)))
+            }
             RoundIconButton(systemName: "gearshape", label: "Settings") {
                 withAnimation(.snappy(duration: 0.25)) { showingSettings = true }
             }
@@ -210,6 +214,20 @@ struct PopoverView: View {
         .font(.brand(11))
         .padding(4)
         .floating(theme.surface, in: Capsule())
+        .animation(.easeOut(duration: 0.2), value: updateShown)
+    }
+
+    /// Kept out of the way while screenshots are selected, the footer is full then.
+    private var updateShown: Updater.Release? {
+        model.settings.tab == .usage || selection.isEmpty ? model.updater.available : nil
+    }
+
+    private func updateButton(_ release: Updater.Release) -> some View {
+        let installing = model.updater.state == .installing
+        return Button(installing ? "Updating…" : "Update") { model.updater.install() }
+            .buttonStyle(PillButtonStyle(prominent: true))
+            .disabled(installing)
+            .help("Update to Burn \(release.version)")
     }
 
     private var syncStatus: some View {
