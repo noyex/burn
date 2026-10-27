@@ -25,7 +25,7 @@ cp "$BIN" "$APP/Contents/MacOS/Burn"
 # Liquid Glass icon (Assets.car) for macOS 26+, plus the AppIcon.icns fallback for older systems.
 xcrun actool assets/AppIcon.icon --compile "$APP/Contents/Resources" --platform macosx \
   --minimum-deployment-target 14.0 --app-icon AppIcon \
-  --output-partial-info-plist "$(mktemp)" >/dev/null
+  --output-partial-info-plist "$(mktemp)" --output-format human-readable-text --errors --warnings
 cp -R assets/Fonts "$APP/Contents/Resources/Fonts"
 
 # 1.2.0 from the latest v1.2.0 tag; the build number is the commit count.
