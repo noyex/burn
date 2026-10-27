@@ -22,7 +22,10 @@ APP=build/Burn.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Burn"
-[[ -f assets/AppIcon.icns ]] && cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# Liquid Glass icon (Assets.car) for macOS 26+, plus the AppIcon.icns fallback for older systems.
+xcrun actool assets/AppIcon.icon --compile "$APP/Contents/Resources" --platform macosx \
+  --minimum-deployment-target 14.0 --app-icon AppIcon \
+  --output-partial-info-plist "$(mktemp)" --output-format human-readable-text --errors --warnings
 cp -R assets/Fonts "$APP/Contents/Resources/Fonts"
 
 # 1.2.0 from the latest v1.2.0 tag; the build number is the commit count.
@@ -39,6 +42,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>Burn</string>
   <key>CFBundleExecutable</key><string>Burn</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundleIconName</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD</string>

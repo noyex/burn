@@ -14,7 +14,7 @@ Live rate limits for Claude Code, Codex and Cursor, plus what your usage would h
 
 [**Download Burn.dmg**](https://github.com/noyex/burn/releases/latest/download/Burn.dmg)
 
-<img src="docs/screenshot.png" width="360" alt="Burn popover">
+<img src="docs/screenshot.png" width="560" alt="Burn popover">
 
 </div>
 

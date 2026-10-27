@@ -50,14 +50,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             statusItem = StatusItemController(model: model)
         }
-        // A preview next to the installed app would save every copied image twice.
-        model.start(capturingClipboard: !preview)
+        // A preview next to the installed app would save every copied image twice,
+        // and updating it would replace the build it runs from.
+        model.start(capturingClipboard: !preview, checkingUpdates: !preview)
     }
 
     /// Development aid: the popover content in a plain off-screen window that stays open,
     /// so it can be captured with `screencapture -l` and driven through Accessibility.
     private static func makePreviewWindow(model: AppModel) -> NSWindow {
-        let host = NSHostingController(rootView: PopoverView(model: model))
+        // No icon to hang under: the content sits at the window's top-left corner.
+        let canvas = PanelCanvas()
+        canvas.width = 0
+        let host = NSHostingController(rootView: PopoverView(model: model, canvas: canvas))
         host.sizingOptions = .preferredContentSize
         let window = NSWindow(contentViewController: host)
         window.styleMask = [.titled, .fullSizeContentView]
