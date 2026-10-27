@@ -1,0 +1,51 @@
+name: PR checks
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Title follows Conventional Commits
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if [[ ! "$TITLE" =~ ^(feat|fix|refactor|perf|style|docs|test|build|ci|chore|revert)(\([a-z0-9-]+\))?!?:\ .+ ]]; then
+            echo "::error::PR title must follow Conventional Commits, e.g. 'feat: show Cursor limits' or 'fix(ui): clipped tile label'. Got: $TITLE"
+            exit 1
+          fi
+
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - name: UI changes come with a screenshot or video
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BODY: ${{ github.event.pull_request.body }}
+          NO_UI: ${{ contains(github.event.pull_request.labels.*.name, 'no-ui') }}
+        run: |
+          ui_files="$(gh pr diff "$PR" --repo "$REPO" --name-only | grep -E '^(Sources/Burn/UI/|assets/|docs/screenshot)' || true)"
+          if [[ -z "$ui_files" ]]; then
+            echo "No UI files changed."
+            exit 0
+          fi
+          if [[ "$NO_UI" == true ]]; then
+            echo "UI files changed, but the PR is labeled no-ui."
+            exit 0
+          fi
+          if grep -qiE '!\[|<img|<video|github\.com/user-attachments/|\.(png|jpe?g|gif|webp|mov|mp4)' <<<"$BODY"; then
+            echo "Found a screenshot or video in the description."
+            exit 0
+          fi
+          echo "::error::This PR changes UI files but its description has no screenshot or video. Drag one into the description (before/after if it changes something existing). A maintainer can add the no-ui label if nothing visible changes."
+          echo "UI files:"
+          echo "$ui_files"
+          exit 1
