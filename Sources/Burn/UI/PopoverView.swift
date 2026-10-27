@@ -10,41 +10,48 @@ struct PopoverView: View {
     @State private var hoveringShare = false
     @State private var resetTasks: [String: Task<Void, Never>] = [:]
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private static let padding: CGFloat = 8
     private var theme: Theme { Theme(scheme) }
     private var expanded: Bool { !showingSettings && model.settings.tab == .shelf && model.settings.shelfExpanded }
-    private var width: CGFloat { expanded ? 660 : 320 }
+    /// Width of the blocks; the panel adds room for their shadows around it.
+    private var width: CGFloat { expanded ? 644 : 304 }
 
     var body: some View {
+        let visible = model.popoverVisible
         Group {
             if showingSettings {
                 SettingsView(model: model) { showingSettings = false }
+                    .block(theme.surface)
             } else {
                 main
             }
         }
-        .padding(Self.padding)
         .frame(width: width)
-        .background(theme.base)
+        // Nearly invisible, but catches clicks in the gaps between blocks so they don't
+        // fall through to the window below and close the panel.
+        .background(Color.black.opacity(0.001))
+        .padding(Bento.shadowInset)
         .foregroundStyle(theme.text)
+        // Grows out of the menu bar icon; only animates in, the panel fades itself out.
+        .scaleEffect(visible || reduceMotion ? 1 : 0.96, anchor: .top)
+        .opacity(visible ? 1 : 0)
+        .animation(visible ? .easeOut(duration: 0.2) : nil, value: visible)
     }
 
     private var main: some View {
         @Bindable var settings = model.settings
         return VStack(alignment: .leading, spacing: Bento.gap) {
             HStack(spacing: Bento.gap) {
-                PillSegmented(options: PopoverTab.allCases, selection: $settings.tab,
-                              style: .init(track: theme.neutral, selected: theme.raised,
-                                           selectedText: theme.text, text: theme.secondary),
-                              accessibilityLabel: "View") { $0.title }
+                IconSwitcher(selection: $settings.tab)
+                Spacer()
                 if settings.tab == .shelf { expandButton }
             }
             .padding(.bottom, 2)
             switch settings.tab {
             case .usage: usage
             case .shelf:
-                ShelfView(shelf: model.shelf, width: width - Self.padding * 2,
+                ShelfView(shelf: model.shelf, width: width,
                           columns: expanded ? 4 : 2, maxHeight: expanded ? 560 : 380,
                           selection: $selection)
             }
@@ -59,7 +66,7 @@ struct PopoverView: View {
     private var expandButton: some View {
         let expanded = model.settings.shelfExpanded
         return RoundIconButton(systemName: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
-                               label: expanded ? "Make shelf smaller" : "Make shelf bigger", size: 30) {
+                               label: expanded ? "Make shelf smaller" : "Make shelf bigger", size: 36, floating: true) {
             model.settings.shelfExpanded.toggle()
         }
     }
@@ -149,6 +156,8 @@ struct PopoverView: View {
             RoundIconButton(systemName: "gearshape", label: "Settings") { showingSettings = true }
         }
         .font(.brand(11))
+        .padding(4)
+        .floating(theme.surface, in: Capsule())
     }
 
     private var syncStatus: some View {
@@ -158,7 +167,7 @@ struct PopoverView: View {
                     .opacity(model.hasUsage ? 1 : 0)
             }
             .foregroundStyle(theme.secondary)
-            .padding(.leading, 4)
+            .padding(.leading, 8)
             Spacer()
         }
     }
@@ -213,7 +222,7 @@ struct PopoverView: View {
                 .buttonStyle(PillButtonStyle(destructive: confirmingClear))
             }
         } else {
-            Text("\(selected.count) selected").foregroundStyle(theme.secondary).padding(.leading, 4)
+            Text("\(selected.count) selected").foregroundStyle(theme.secondary).padding(.leading, 8)
             Spacer()
             Button("Deselect") { selection = [] }
                 .buttonStyle(PillButtonStyle())
