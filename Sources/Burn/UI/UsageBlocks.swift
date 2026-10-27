@@ -301,8 +301,15 @@ struct SpendBars: View {
     let usage: UsageSummary
     let ink: Color
 
-    @State private var grown = false
+    @State private var grown: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// `animated: false` draws the bars at full height right away, e.g. for an image render.
+    init(usage: UsageSummary, ink: Color, animated: Bool = true) {
+        self.usage = usage
+        self.ink = ink
+        _grown = State(initialValue: !animated)
+    }
 
     private static let shades: [ProviderID: Double] = [.claude: 1, .codex: 0.45, .cursor: 0.25]
 
@@ -320,6 +327,7 @@ struct SpendBars: View {
             .scaleEffect(x: 1, y: grown ? 1 : 0.02, anchor: .bottom)
         }
         .onAppear {
+            guard !grown else { return }
             if reduceMotion { grown = true; return }
             withAnimation(.spring(duration: 0.4, bounce: 0)) { grown = true }
         }

@@ -6,6 +6,8 @@ struct PopoverView: View {
     @State private var selection: Set<URL> = []
     @State private var confirmingClear = false
     @State private var copiedSelection = false
+    @State private var copiedShare = false
+    @State private var hoveringShare = false
     @State private var resetTasks: [String: Task<Void, Never>] = [:]
     @Environment(\.colorScheme) private var scheme
 
@@ -139,7 +141,9 @@ struct PopoverView: View {
     private var footer: some View {
         HStack(spacing: Bento.gap) {
             switch model.settings.tab {
-            case .usage: syncStatus
+            case .usage:
+                syncStatus
+                if let usage = model.usage, usage.cost > 0 { shareButton(usage) }
             case .shelf: shelfActions
             }
             RoundIconButton(systemName: "gearshape", label: "Settings") { showingSettings = true }
@@ -157,6 +161,37 @@ struct PopoverView: View {
             .padding(.leading, 4)
             Spacer()
         }
+    }
+
+    /// Copies an image of the period's spend; morphs into "Copied" for a moment.
+    private func shareButton(_ usage: UsageSummary) -> some View {
+        Button {
+            guard ShareCard.copy(usage) else { return }
+            withAnimation(.snappy(duration: 0.25)) { copiedShare = true }
+            resetLater("share", after: 1.4) {
+                withAnimation(.easeOut(duration: 0.25)) { copiedShare = false }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: copiedShare ? "checkmark" : "square.and.arrow.up")
+                    .font(.system(size: 11, weight: .semibold))
+                    .offset(y: copiedShare ? 0 : -1)
+                    .contentTransition(.symbolEffect(.replace))
+                if copiedShare {
+                    Text("Copied").font(.brand(11, .bold))
+                        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .leading)))
+                }
+            }
+            .foregroundStyle(copiedShare ? theme.text : theme.secondary)
+            .padding(.horizontal, copiedShare ? 10 : 0)
+            .frame(minWidth: 28, minHeight: 28)
+            .background(hoveringShare ? theme.neutralHover : theme.neutral, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(PressStyle())
+        .onHover { h in withAnimation(.easeOut(duration: 0.15)) { hoveringShare = h } }
+        .help("Copy an image of your spend")
+        .accessibilityLabel(copiedShare ? "Copied" : "Copy an image of your spend")
     }
 
     @ViewBuilder

@@ -16,7 +16,7 @@ final class ShelfStore {
     static let maxItems = 100
     nonisolated static let directory = URL(fileURLWithPath: UsageStore.supportDir + "/Shelf", isDirectory: true)
     /// Marks pasteboard contents written by Burn itself so they aren't captured again.
-    private static let ownType = NSPasteboard.PasteboardType("com.mikolaj.burn.shelf")
+    static let ownType = NSPasteboard.PasteboardType("com.mikolaj.burn.shelf")
     /// Types other apps set on passwords and transient data (nspasteboard.org).
     private static let skippedTypes: Set<NSPasteboard.PasteboardType> = [
         .init("org.nspasteboard.ConcealedType"), .init("org.nspasteboard.TransientType"),
