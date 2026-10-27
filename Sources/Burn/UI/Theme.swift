@@ -17,6 +17,13 @@ struct Theme {
     var raised: Color { dark ? Color(hex: 0x3D3936) : .white }
     var text: Color { dark ? Color(hex: 0xF2EFEA) : Color(hex: 0x1C1A17) }
     var secondary: Color { dark ? Color(hex: 0x9C958C) : Color(hex: 0x7A746C) }
+    /// Standalone chrome floating over the desktop: the footer, settings, the expand button.
+    var surface: Color { dark ? Color(hex: 0x1F1D1B) : Color(hex: 0xFBFAF8) }
+    /// The dark tab switcher capsule, in both appearances.
+    var switcher: Color { dark ? Color(hex: 0x2E2B28) : Color(hex: 0x1C1A17) }
+    /// Edge that keeps dark blocks apart from a dark desktop.
+    var hairline: Color { dark ? .white.opacity(0.08) : .black.opacity(0.04) }
+    var shadow: Color { .black.opacity(dark ? 0.4 : 0.16) }
 
     static let lime = Color(hex: 0xDFF26B)
     static let limeInk = Color(hex: 0x1A1D06)
@@ -51,7 +58,7 @@ struct Theme {
         }
     }
 
-    /// Popover background as an appearance-aware AppKit color, for the popover's own chrome.
+    /// Popover background as an appearance-aware AppKit color, for the preview window.
     static let baseNSColor = NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             ? NSColor(srgbRed: 0x16 / 255, green: 0x15 / 255, blue: 0x14 / 255, alpha: 1)
