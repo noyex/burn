@@ -5,44 +5,27 @@ import SwiftUI
 final class StatusItemController: NSObject {
     private let model: AppModel
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private var host: NSHostingController<PopoverView>!
+    private let host: NSHostingController<PopoverView>
     private let panel = FloatingPanel()
-    /// What the SwiftUI content last asked for; the panel follows it.
-    private var contentSize = NSSize.zero
+    private let canvas = PanelCanvas()
     private var outsideClicks: Any?
     private var workspaceObservers: [NSObjectProtocol] = []
     private var isOpen = false
-    private var pendingShrink: DispatchWorkItem?
-    private var resizeObserver: NSObjectProtocol?
-    /// Fixed size of the hosting view, larger than the content can ever get.
-    private static let canvas = NSSize(width: 1000, height: 1600)
     /// Bumped on every open so a fade-out that finishes late doesn't hide a reopened panel.
     private var generation = 0
 
     init(model: AppModel) {
         self.model = model
+        host = NSHostingController(rootView: PopoverView(model: model, canvas: canvas))
         super.init()
-        host = NSHostingController(rootView: PopoverView(model: model) { [weak self] size in
-            self?.resize(to: size)
-        })
-        // Sized by hand from what the content reports, so nothing else fights over the frame.
+        // The window is a see-through canvas big enough for anything the content can become,
+        // placed once per open and never resized while shown. SwiftUI alone moves and resizes
+        // the blocks on it, so no AppKit frame change can cut across one of its animations.
         host.sizingOptions = []
         host.view.wantsLayer = true
         host.view.layer?.backgroundColor = .clear
-        // The hosting view never changes size: it hangs, centered, from the top of a plain
-        // container, and the panel only decides how much of it shows. If SwiftUI saw its size
-        // change, it would re-center the old content for a frame before animating it back up.
-        let container = CanvasContainer()
-        container.wantsLayer = true
-        host.view.frame.size = Self.canvas
-        container.addSubview(host.view)
-        panel.contentView = container
+        panel.contentView = host.view
         panel.onCancel = { [weak self] in self?.close() }
-        // Whatever resizes the panel, it must not end up past the edge of the screen.
-        resizeObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didResizeNotification, object: panel, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.keepOnScreen() }
-        }
 
         item.button?.target = self
         item.button?.action = #selector(toggle)
@@ -109,51 +92,20 @@ final class StatusItemController: NSObject {
         workspaceObservers = []
     }
 
-    /// Grows the panel at once. A change in width slides along with SwiftUI's animation, so the
-    /// content doesn't snap sideways when it re-centers under the icon; a shorter one shrinks only
-    /// after the content has animated up, so it isn't clipped mid-animation.
-    private func resize(to size: CGSize) {
-        guard size != contentSize, size.width > 0, size.height > 0 else { return }
-        contentSize = size
-        pendingShrink?.cancel()
-        if size.width != panel.frame.width {
-            return place(animated: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
-        }
-        guard size.height < panel.frame.height else { return place() }
-        let shrink = DispatchWorkItem { [weak self] in self?.place() }
-        pendingShrink = shrink
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: shrink)
-    }
-
-    /// Hangs the panel under the menu bar icon, top edge fixed, kept on screen.
-    private func place(animated: Bool = false) {
+    /// Hangs the canvas under the menu bar icon, top edge fixed, kept on screen, and tells the
+    /// content where along it the icon is so it can center itself underneath.
+    private func place() {
         guard let button = item.button, let window = button.window,
               let screen = window.screen ?? NSScreen.main else { return }
-        // Before the first open nothing has been laid out yet; doing it reports the size.
-        if contentSize == .zero { host.view.layoutSubtreeIfNeeded() }
-        let size = contentSize
-        guard size != .zero else { return }
         let icon = window.convertToScreen(button.convert(button.bounds, to: nil))
         let visible = screen.visibleFrame
-        let x = max(min(icon.midX - size.width / 2, visible.maxX - size.width), visible.minX)
-        let frame = NSRect(x: x, y: icon.minY - 2 - size.height, width: size.width, height: size.height)
-        guard animated, panel.isVisible else { return panel.setFrame(frame, display: true) }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.25
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(frame, display: true)
-        }
-    }
-
-    /// Slides the panel back inside the screen horizontally, keeping its size and top edge.
-    private func keepOnScreen() {
-        guard let screen = item.button?.window?.screen ?? panel.screen ?? NSScreen.main else { return }
-        let visible = screen.visibleFrame
-        var frame = panel.frame
-        let x = max(min(frame.minX, visible.maxX - frame.width), visible.minX)
-        guard x != frame.minX else { return }
-        frame.origin.x = x
-        panel.setFrame(frame, display: true)
+        let top = icon.minY - 2
+        let size = NSSize(width: min(PanelCanvas.maxSize.width, visible.width),
+                          height: min(PanelCanvas.maxSize.height, top - visible.minY))
+        let x = max(min(icon.midX - size.width / 2, visible.maxX - size.width), visible.minX).rounded()
+        panel.setFrame(NSRect(x: x, y: top - size.height, width: size.width, height: size.height), display: false)
+        canvas.width = size.width
+        canvas.anchorX = (icon.midX - x).rounded()
     }
 
     private func render() {
@@ -163,17 +115,6 @@ final class StatusItemController: NSObject {
         item.button?.setAccessibilityLabel(
             entries.isEmpty ? "Burn"
                 : entries.map { "\($0.provider.name) \(Format.remaining($0.percent)) left" }.joined(separator: ", "))
-    }
-}
-
-/// Keeps its only subview, the fixed-size canvas, centered and hanging from the top edge,
-/// on every resize including each step of an animated one.
-private final class CanvasContainer: NSView {
-    override func resizeSubviews(withOldSize oldSize: NSSize) {
-        for view in subviews {
-            view.setFrameOrigin(NSPoint(x: ((bounds.width - view.frame.width) / 2).rounded(),
-                                        y: bounds.height - view.frame.height))
-        }
     }
 }
 
