@@ -1,4 +1,4 @@
-// Renders assets/AppIcon.icns: white "BRN" in Bricolage Grotesque on an orange squircle.
+// Renders assets/AppIcon.icns: white "brn" in Bricolage Grotesque on an orange squircle.
 import AppKit
 import CoreText
 
@@ -11,7 +11,7 @@ let iconset = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponen
 try? FileManager.default.removeItem(at: iconset)
 try FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
 
-let orange = NSColor(srgbRed: 1.0, green: 0.353, blue: 0.122, alpha: 1) // #FF5A1F
+let orange = NSColor(srgbRed: 0.941, green: 0.306, blue: 0.078, alpha: 1) // #F04E14
 
 func render(_ px: Int) -> Data {
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px, bitsPerSample: 8,
@@ -23,21 +23,20 @@ func render(_ px: Int) -> Data {
     orange.setFill()
     NSBezierPath(roundedRect: r, xRadius: r.width * 0.225, yRadius: r.width * 0.225).fill()
 
-    // Size the word to a fixed share of the tile width, then center it on its cap height.
-    func attributed(_ size: CGFloat) -> NSAttributedString {
+    // Size the word's ink to a fixed share of the tile width, then center it on its x-height.
+    func line(_ size: CGFloat) -> (CTLine, NSFont) {
         let font = NSFont(name: "BricolageGrotesque96pt-ExtraBold", size: size) ?? .systemFont(ofSize: size, weight: .heavy)
-        return NSAttributedString(string: "BRN", attributes: [.font: font, .foregroundColor: NSColor.white, .kern: -size * 0.012])
+        let text = NSAttributedString(string: "brn", attributes: [.font: font, .foregroundColor: NSColor.white, .kern: -size * 0.012])
+        return (CTLineCreateWithAttributedString(text), font)
     }
-    let probe = attributed(100)
-    let text = attributed(100 * r.width * 0.76 / probe.size().width)
-    let font = text.attribute(.font, at: 0, effectiveRange: nil) as! NSFont
-    let line = CTLineCreateWithAttributedString(text)
     let ctx = NSGraphicsContext.current!.cgContext
-    let ink = CTLineGetImageBounds(line, ctx)
+    let probe = CTLineGetImageBounds(line(100).0, ctx)
+    let (word, font) = line(100 * r.width * 0.76 / probe.width)
+    let ink = CTLineGetImageBounds(word, ctx)
     let x = (s - ink.width) / 2 - ink.minX
-    let y = (s - font.capHeight) / 2
+    let y = (s - font.xHeight) / 2
     ctx.textPosition = CGPoint(x: x, y: y)
-    CTLineDraw(line, ctx)
+    CTLineDraw(word, ctx)
 
     NSGraphicsContext.restoreGraphicsState()
     return rep.representation(using: .png, properties: [:])!
