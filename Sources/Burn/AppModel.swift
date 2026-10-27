@@ -33,6 +33,8 @@ final class AppModel {
     /// False until at least one usage record exists (no Claude Code / Codex logs yet).
     private(set) var hasUsage = true
     private(set) var usageError: String?
+    /// False while the popover is closed, so its content can animate in on every open.
+    var popoverVisible = true
 
     var period: Period = .all {
         didSet { if period != oldValue { Task { await loadUsage() } } }

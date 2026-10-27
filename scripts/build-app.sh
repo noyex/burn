@@ -11,6 +11,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Burn"
 [[ -f assets/AppIcon.icns ]] && cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp -R assets/Fonts "$APP/Contents/Resources/Fonts"
 
 VERSION="$(git describe --tags --always 2>/dev/null || echo dev)"
 cat > "$APP/Contents/Info.plist" <<PLIST

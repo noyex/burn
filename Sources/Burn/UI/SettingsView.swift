@@ -3,19 +3,23 @@ import SwiftUI
 struct SettingsView: View {
     let model: AppModel
     let onBack: () -> Void
+    @Environment(\.colorScheme) private var scheme
+
+    private var theme: Theme { Theme(scheme) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Bento.gap) {
             HStack(spacing: 10) {
-                GlassIconButton(systemName: "chevron.left", label: "Back", size: 28, action: onBack)
-                Text("Settings").font(.system(size: 13, weight: .semibold))
+                RoundIconButton(systemName: "chevron.left", label: "Back", action: onBack)
+                Text("Settings").font(.brand(14, .bold))
             }
+            .padding(.bottom, 4)
 
             if !model.connected.isEmpty {
                 sectionTitle("MENU BAR")
                 group {
                     ForEach(Array(model.connected.enumerated()), id: \.element) { i, p in
-                        if i > 0 { Divider() }
+                        if i > 0 { Divider().opacity(0.6) }
                         providerRow(p)
                     }
                 }
@@ -24,7 +28,7 @@ struct SettingsView: View {
             sectionTitle("ACCOUNTS")
             group {
                 ForEach(Array(ProviderID.allCases.enumerated()), id: \.element) { i, p in
-                    if i > 0 { Divider() }
+                    if i > 0 { Divider().opacity(0.6) }
                     accountRow(p)
                 }
             }
@@ -66,22 +70,25 @@ struct SettingsView: View {
 
             Button("Quit Burn") { NSApp.terminate(nil) }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .font(.caption)
+                .foregroundStyle(theme.secondary)
+                .font(.brand(11))
                 .padding(.leading, 4)
+                .padding(.top, 4)
         }
     }
 
     private func sectionTitle(_ title: String) -> some View {
-        Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+        Text(title).font(.brand(10, .bold)).kerning(0.4).foregroundStyle(theme.secondary)
             .padding(.leading, 4)
+            .padding(.top, 6)
     }
 
     private func group(@ViewBuilder _ content: () -> some View) -> some View {
         VStack(spacing: 0) { content() }
-            .padding(.horizontal, 10)
+            .font(.brand(12))
+            .padding(.horizontal, 12)
             .frame(maxWidth: .infinity)
-            .glass(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(theme.neutral, in: Bento.blockShape)
     }
 
     @ViewBuilder
@@ -92,11 +99,11 @@ struct SettingsView: View {
             return true
         }()
         HStack(spacing: 8) {
-            ProviderGlyph(provider: p)
+            ProviderGlyph(provider: p, color: theme.text)
             Text(p.name)
             Spacer()
             if signedIn {
-                Text("Signed in").font(.caption).foregroundStyle(.secondary)
+                Text("Signed in").font(.brand(11)).foregroundStyle(theme.secondary)
             } else {
                 CommandChip(command: p.loginCommand)
             }
@@ -108,7 +115,7 @@ struct SettingsView: View {
     private func providerRow(_ p: ProviderID) -> some View {
         let windows = model.limits[p]?.limits?.windows ?? []
         HStack(spacing: 8) {
-            ProviderGlyph(provider: p)
+            ProviderGlyph(provider: p, color: theme.text)
             Text(p.name)
             Spacer()
             if windows.count > 1 {

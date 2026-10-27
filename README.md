@@ -6,9 +6,10 @@ plus what your usage would have cost at API prices — today, this week, this mo
 
 <img src="docs/screenshot.png" width="320" alt="Burn popover">
 
-- **Menu bar**: each provider's logo with its most-used limit. Turns orange at 80%, red at 100%.
+- **Menu bar**: each provider's logo with what's left of its most-used limit. Turns orange at 20% left, red at 0%.
 - **Limits**: every window the provider reports (Claude 5h / weekly, Codex, Cursor monthly / API) with reset times.
 - **Usage**: cost, tokens and a per-provider chart, computed locally from Claude Code and Codex session logs.
+- **Share**: copies an image of your spend to the clipboard, ready to paste anywhere.
 - **Settings**: choose which providers appear in the menu bar and which limit each one shows; launch at login.
 
 Native SwiftUI + AppKit, no Electron, no dependencies, ~1 MB.
@@ -58,3 +59,7 @@ swift build
 ## License
 
 MIT. Provider logos come from [Simple Icons](https://simpleicons.org) (CC0) and are trademarks of their owners.
+
+## Credits
+
+Set in [Bricolage Grotesque](https://github.com/ateliertriay/bricolage) (SIL Open Font License, see `assets/Fonts/OFL.txt`).

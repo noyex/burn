@@ -2,37 +2,150 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class StatusItemController: NSObject, NSPopoverDelegate {
+final class StatusItemController: NSObject {
     private let model: AppModel
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private let popover = NSPopover()
+    private let host: NSHostingController<PopoverView>
+    private let panel = FloatingPanel()
+    private var sizeObservation: NSKeyValueObservation?
+    private var outsideClicks: Any?
+    private var workspaceObservers: [NSObjectProtocol] = []
+    private var isOpen = false
+    private var pendingShrink: DispatchWorkItem?
+    private var resizeObserver: NSObjectProtocol?
+    /// Bumped on every open so a fade-out that finishes late doesn't hide a reopened panel.
+    private var generation = 0
 
     init(model: AppModel) {
         self.model = model
+        host = NSHostingController(rootView: PopoverView(model: model))
         super.init()
-        popover.behavior = .transient
-        popover.animates = true
-        popover.delegate = self
-        let host = NSHostingController(rootView: PopoverView(model: model))
         host.sizingOptions = .preferredContentSize
-        popover.contentViewController = host
+        host.view.wantsLayer = true
+        host.view.layer?.backgroundColor = .clear
+        panel.contentView = host.view
+        panel.onCancel = { [weak self] in self?.close() }
+        // Whatever resizes the panel (expanding the shelf, the hosting view itself),
+        // it must not end up past the edge of the screen.
+        resizeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification, object: panel, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.keepOnScreen() }
+        }
+        sizeObservation = host.observe(\.preferredContentSize) { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.resize() }
+        }
 
         item.button?.target = self
         item.button?.action = #selector(toggle)
         item.button?.imagePosition = .imageOnly
         model.onMenuBarChange = { [weak self] in self?.render() }
+        model.popoverVisible = false
         render()
     }
 
     @objc private func toggle() {
-        guard let button = item.button else { return }
-        if popover.isShown {
-            popover.performClose(nil)
-        } else {
-            model.popoverOpened()
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
+        isOpen ? close() : open()
+    }
+
+    private func open() {
+        isOpen = true
+        generation += 1
+        model.popoverOpened()
+        place()
+        // Through the animator, so it replaces a fade-out that is still running.
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0
+            panel.animator().alphaValue = 1
         }
+        panel.makeKeyAndOrderFront(nil)
+        // Next turn of the run loop, so the content is laid out hidden and animates in.
+        DispatchQueue.main.async { [weak self] in self?.model.popoverVisible = true }
+
+        removeMonitors()
+        outsideClicks = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) {
+            [weak self] _ in MainActor.assumeIsolated { self?.close() }
+        }
+        // Like a transient popover: switching apps or Spaces from the keyboard closes it too.
+        let center = NSWorkspace.shared.notificationCenter
+        workspaceObservers = [NSWorkspace.activeSpaceDidChangeNotification, NSWorkspace.didActivateApplicationNotification]
+            .map { name in
+                center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.close() }
+                }
+            }
+    }
+
+    private func close() {
+        guard isOpen else { return }
+        isOpen = false
+        removeMonitors()
+        let current = generation
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.15
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 0
+        } completionHandler: { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.generation == current else { return }
+                self.panel.orderOut(nil)
+                self.model.popoverVisible = false
+            }
+        }
+    }
+
+    private func removeMonitors() {
+        if let outsideClicks { NSEvent.removeMonitor(outsideClicks) }
+        workspaceObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
+        outsideClicks = nil
+        workspaceObservers = []
+    }
+
+    /// Grows the panel at once. A narrower panel slides along with SwiftUI's animation, so the
+    /// content doesn't snap sideways when it re-centers under the icon; a shorter one shrinks only
+    /// after the content has animated down, so it isn't clipped mid-animation.
+    private func resize() {
+        pendingShrink?.cancel()
+        let size = contentSize
+        if size.width < panel.frame.width {
+            return place(animated: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+        }
+        guard size.height < panel.frame.height else { return place() }
+        let shrink = DispatchWorkItem { [weak self] in self?.place() }
+        pendingShrink = shrink
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: shrink)
+    }
+
+    private var contentSize: NSSize {
+        let size = host.preferredContentSize
+        return size == .zero ? host.view.fittingSize : size
+    }
+
+    /// Hangs the panel under the menu bar icon, top edge fixed, kept on screen.
+    private func place(animated: Bool = false) {
+        guard let button = item.button, let window = button.window,
+              let screen = window.screen ?? NSScreen.main else { return }
+        let size = contentSize
+        let icon = window.convertToScreen(button.convert(button.bounds, to: nil))
+        let visible = screen.visibleFrame
+        let x = max(min(icon.midX - size.width / 2, visible.maxX - size.width), visible.minX)
+        let frame = NSRect(x: x, y: icon.minY - 2 - size.height, width: size.width, height: size.height)
+        guard animated else { return panel.setFrame(frame, display: true) }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.25
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().setFrame(frame, display: true)
+        }
+    }
+
+    /// Slides the panel back inside the screen horizontally, keeping its size and top edge.
+    private func keepOnScreen() {
+        guard let screen = item.button?.window?.screen ?? panel.screen ?? NSScreen.main else { return }
+        let visible = screen.visibleFrame
+        var frame = panel.frame
+        let x = max(min(frame.minX, visible.maxX - frame.width), visible.minX)
+        guard x != frame.minX else { return }
+        frame.origin.x = x
+        panel.setFrame(frame, display: true)
     }
 
     private func render() {
@@ -41,8 +154,29 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         item.button?.image = image
         item.button?.setAccessibilityLabel(
             entries.isEmpty ? "Burn"
-                : entries.map { "\($0.provider.name) \(Format.percent($0.percent))" }.joined(separator: ", "))
+                : entries.map { "\($0.provider.name) \(Format.remaining($0.percent)) left" }.joined(separator: ", "))
     }
+}
+
+/// Borderless, see-through panel: the blocks float over the desktop with nothing behind them.
+private final class FloatingPanel: NSPanel {
+    var onCancel: (() -> Void)?
+
+    init() {
+        super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = false
+        level = .popUpMenu
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
+        hidesOnDeactivate = false
+        isReleasedWhenClosed = false
+        animationBehavior = .none
+    }
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+    override func cancelOperation(_ sender: Any?) { onCancel?() }
 }
 
 /// Draws provider logos + percentages as one image. The drawing handler runs at draw time,
@@ -63,8 +197,8 @@ enum MenuBarImage {
         }
         struct Part { let icon: CGImage?; let text: String; let level: Level }
         let parts = entries.map { e -> Part in
-            var text = Format.percent(e.percent)
-            if e.percent >= 100, e.resetsAt != nil { text += " · " + Format.shortReset(e.resetsAt) }
+            var text = Format.remaining(e.percent)
+            if Level(e.percent) == .full, e.resetsAt != nil { text += " · " + Format.shortReset(e.resetsAt) }
             let icon = ProviderIcon.image(e.provider)
             var rect = CGRect(x: 0, y: 0, width: iconSize * 2, height: iconSize * 2)
             return Part(icon: icon.cgImage(forProposedRect: &rect, context: nil, hints: nil),
@@ -100,7 +234,9 @@ enum MenuBarImage {
     enum Level {
         case normal, warn, full
         init(_ percent: Double) {
-            self = percent >= 100 ? .full : percent >= AppModel.warnPercent ? .warn : .normal
+            // From the rounded share left, so a block reading "0%" is always .full.
+            let left = min(max(100 - percent, 0), 100).rounded()
+            self = left <= 0 ? .full : left <= 100 - AppModel.warnPercent ? .warn : .normal
         }
         var color: NSColor {
             switch self {
