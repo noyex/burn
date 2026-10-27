@@ -27,6 +27,7 @@ enum BurnMain {
             RunLoop.main.run()
             return
         }
+        BrandFont.register()
         let app = NSApplication.shared
         let delegate = AppDelegate()
         self.delegate = delegate
