@@ -28,6 +28,9 @@ struct PopoverView: View {
             }
         }
         .frame(width: width)
+        // Nearly invisible, but catches clicks in the gaps between blocks so they don't
+        // fall through to the window below and close the panel.
+        .background(Color.black.opacity(0.001))
         .padding(Bento.shadowInset)
         .foregroundStyle(theme.text)
         // Grows out of the menu bar icon; only animates in, the panel fades itself out.

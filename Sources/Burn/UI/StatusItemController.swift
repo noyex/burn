@@ -9,7 +9,9 @@ final class StatusItemController: NSObject {
     private let panel = FloatingPanel()
     private var sizeObservation: NSKeyValueObservation?
     private var outsideClicks: Any?
-    private var spaceChanges: NSObjectProtocol?
+    private var workspaceObservers: [NSObjectProtocol] = []
+    private var isOpen = false
+    private var pendingShrink: DispatchWorkItem?
     /// Bumped on every open so a fade-out that finishes late doesn't hide a reopened panel.
     private var generation = 0
 
@@ -23,7 +25,7 @@ final class StatusItemController: NSObject {
         panel.contentView = host.view
         panel.onCancel = { [weak self] in self?.close() }
         sizeObservation = host.observe(\.preferredContentSize) { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.place() }
+            MainActor.assumeIsolated { self?.resize() }
         }
 
         item.button?.target = self
@@ -35,14 +37,19 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func toggle() {
-        panel.isVisible && panel.alphaValue > 0 ? close() : open()
+        isOpen ? close() : open()
     }
 
     private func open() {
+        isOpen = true
         generation += 1
         model.popoverOpened()
         place()
-        panel.alphaValue = 1
+        // Through the animator, so it replaces a fade-out that is still running.
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0
+            panel.animator().alphaValue = 1
+        }
         panel.makeKeyAndOrderFront(nil)
         // Next turn of the run loop, so the content is laid out hidden and animates in.
         DispatchQueue.main.async { [weak self] in self?.model.popoverVisible = true }
@@ -51,14 +58,19 @@ final class StatusItemController: NSObject {
         outsideClicks = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) {
             [weak self] _ in MainActor.assumeIsolated { self?.close() }
         }
-        spaceChanges = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.close() }
-        }
+        // Like a transient popover: switching apps or Spaces from the keyboard closes it too.
+        let center = NSWorkspace.shared.notificationCenter
+        workspaceObservers = [NSWorkspace.activeSpaceDidChangeNotification, NSWorkspace.didActivateApplicationNotification]
+            .map { name in
+                center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.close() }
+                }
+            }
     }
 
     private func close() {
-        guard panel.isVisible else { return }
+        guard isOpen else { return }
+        isOpen = false
         removeMonitors()
         let current = generation
         NSAnimationContext.runAnimationGroup { ctx in
@@ -76,17 +88,32 @@ final class StatusItemController: NSObject {
 
     private func removeMonitors() {
         if let outsideClicks { NSEvent.removeMonitor(outsideClicks) }
-        if let spaceChanges { NSWorkspace.shared.notificationCenter.removeObserver(spaceChanges) }
+        workspaceObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
         outsideClicks = nil
-        spaceChanges = nil
+        workspaceObservers = []
+    }
+
+    /// Grows the panel at once, but shrinks it only after SwiftUI has animated the content
+    /// down, so the content isn't clipped mid-animation.
+    private func resize() {
+        pendingShrink?.cancel()
+        let size = contentSize
+        guard size.width < panel.frame.width || size.height < panel.frame.height else { return place() }
+        let shrink = DispatchWorkItem { [weak self] in self?.place() }
+        pendingShrink = shrink
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: shrink)
+    }
+
+    private var contentSize: NSSize {
+        let size = host.preferredContentSize
+        return size == .zero ? host.view.fittingSize : size
     }
 
     /// Hangs the panel under the menu bar icon, top edge fixed, kept on screen.
     private func place() {
         guard let button = item.button, let window = button.window,
               let screen = window.screen ?? NSScreen.main else { return }
-        var size = host.preferredContentSize
-        if size == .zero { size = host.view.fittingSize }
+        let size = contentSize
         let icon = window.convertToScreen(button.convert(button.bounds, to: nil))
         let visible = screen.visibleFrame
         let x = min(max(icon.midX - size.width / 2, visible.minX), visible.maxX - size.width)

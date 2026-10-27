@@ -169,7 +169,7 @@ struct RoundIconButton: View {
                 .frame(width: size, height: size)
                 .background {
                     if floating {
-                        Color.clear.floating(theme.surface, in: Circle())
+                        Color.clear.floating(hovering ? theme.neutral : theme.surface, in: Circle())
                     } else {
                         Circle().fill(hovering ? theme.neutralHover : theme.neutral)
                     }
