@@ -68,12 +68,16 @@ struct SettingsView: View {
                 .frame(height: 32)
             }
 
-            Button("Quit Burn") { NSApp.terminate(nil) }
-                .buttonStyle(.plain)
-                .foregroundStyle(theme.secondary)
-                .font(.brand(11))
-                .padding(.leading, 4)
-                .padding(.top, 4)
+            HStack {
+                Button("Quit Burn") { NSApp.terminate(nil) }
+                    .buttonStyle(.plain)
+                Spacer()
+                Text("Burn \(Updater.current)")
+            }
+            .foregroundStyle(theme.secondary)
+            .font(.brand(11))
+            .padding(.horizontal, 4)
+            .padding(.top, 4)
         }
     }
 
