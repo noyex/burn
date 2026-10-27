@@ -1,0 +1,61 @@
+{
+  "fill-specializations": [
+    {
+      "value": {
+        "solid": "srgb:0.94118,0.30588,0.07843,1.00000"
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "solid": "srgb:0.47059,0.14118,0.02745,1.00000"
+      }
+    },
+    {
+      "appearance": "tinted",
+      "value": "automatic"
+    }
+  ],
+  "groups": [
+    {
+      "name": "brn",
+      "lighting": "individual",
+      "layers": [
+        {
+          "name": "n",
+          "image-name": "brn-n.svg",
+          "glass": true,
+          "fill": "automatic",
+          "opacity": 1
+        },
+        {
+          "name": "r",
+          "image-name": "brn-r.svg",
+          "glass": true,
+          "fill": "automatic",
+          "opacity": 1
+        },
+        {
+          "name": "b",
+          "image-name": "brn-b.svg",
+          "glass": true,
+          "fill": "automatic",
+          "opacity": 1
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.3
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": true,
+        "value": 0.2
+      },
+      "blur-material": 0.2
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}
