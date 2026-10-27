@@ -7,33 +7,25 @@ final class StatusItemController: NSObject {
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let host: NSHostingController<PopoverView>
     private let panel = FloatingPanel()
-    private var sizeObservation: NSKeyValueObservation?
+    private let canvas = PanelCanvas()
     private var outsideClicks: Any?
     private var workspaceObservers: [NSObjectProtocol] = []
     private var isOpen = false
-    private var pendingShrink: DispatchWorkItem?
-    private var resizeObserver: NSObjectProtocol?
     /// Bumped on every open so a fade-out that finishes late doesn't hide a reopened panel.
     private var generation = 0
 
     init(model: AppModel) {
         self.model = model
-        host = NSHostingController(rootView: PopoverView(model: model))
+        host = NSHostingController(rootView: PopoverView(model: model, canvas: canvas))
         super.init()
-        host.sizingOptions = .preferredContentSize
+        // The window is a see-through canvas big enough for anything the content can become,
+        // placed once per open and never resized while shown. SwiftUI alone moves and resizes
+        // the blocks on it, so no AppKit frame change can cut across one of its animations.
+        host.sizingOptions = []
         host.view.wantsLayer = true
         host.view.layer?.backgroundColor = .clear
         panel.contentView = host.view
         panel.onCancel = { [weak self] in self?.close() }
-        // Whatever resizes the panel (expanding the shelf, the hosting view itself),
-        // it must not end up past the edge of the screen.
-        resizeObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didResizeNotification, object: panel, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.keepOnScreen() }
-        }
-        sizeObservation = host.observe(\.preferredContentSize) { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.resize() }
-        }
 
         item.button?.target = self
         item.button?.action = #selector(toggle)
@@ -100,58 +92,39 @@ final class StatusItemController: NSObject {
         workspaceObservers = []
     }
 
-    /// Grows the panel at once. A narrower panel slides along with SwiftUI's animation, so the
-    /// content doesn't snap sideways when it re-centers under the icon; a shorter one shrinks only
-    /// after the content has animated down, so it isn't clipped mid-animation.
-    private func resize() {
-        pendingShrink?.cancel()
-        let size = contentSize
-        if size.width < panel.frame.width {
-            return place(animated: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
-        }
-        guard size.height < panel.frame.height else { return place() }
-        let shrink = DispatchWorkItem { [weak self] in self?.place() }
-        pendingShrink = shrink
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: shrink)
-    }
-
-    private var contentSize: NSSize {
-        let size = host.preferredContentSize
-        return size == .zero ? host.view.fittingSize : size
-    }
-
-    /// Hangs the panel under the menu bar icon, top edge fixed, kept on screen.
-    private func place(animated: Bool = false) {
+    /// Hangs the canvas under the menu bar icon, top edge fixed, kept on screen, and tells the
+    /// content where along it the icon is so it can center itself underneath.
+    private func place() {
         guard let button = item.button, let window = button.window,
               let screen = window.screen ?? NSScreen.main else { return }
-        let size = contentSize
         let icon = window.convertToScreen(button.convert(button.bounds, to: nil))
         let visible = screen.visibleFrame
-        let x = max(min(icon.midX - size.width / 2, visible.maxX - size.width), visible.minX)
-        let frame = NSRect(x: x, y: icon.minY - 2 - size.height, width: size.width, height: size.height)
-        guard animated else { return panel.setFrame(frame, display: true) }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.25
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(frame, display: true)
-        }
+        let top = icon.minY - 2
+        // May reach over the Dock, like a menu does, so a short screen cuts off as little as possible.
+        let size = NSSize(width: min(PanelCanvas.maxSize.width, visible.width),
+                          height: min(PanelCanvas.maxSize.height, top - screen.frame.minY))
+        let x = max(min(icon.midX - size.width / 2, visible.maxX - size.width), visible.minX).rounded()
+        panel.setFrame(NSRect(x: x, y: top - size.height, width: size.width, height: size.height), display: false)
+        canvas.width = size.width
+        canvas.anchorX = (icon.midX - x).rounded()
     }
 
-    /// Slides the panel back inside the screen horizontally, keeping its size and top edge.
-    private func keepOnScreen() {
-        guard let screen = item.button?.window?.screen ?? panel.screen ?? NSScreen.main else { return }
-        let visible = screen.visibleFrame
-        var frame = panel.frame
-        let x = max(min(frame.minX, visible.maxX - frame.width), visible.minX)
-        guard x != frame.minX else { return }
-        frame.origin.x = x
-        panel.setFrame(frame, display: true)
+    /// Re-centers the open content under the icon after the status item changed width.
+    private func realign() {
+        guard isOpen, let button = item.button, let window = button.window else { return }
+        let icon = window.convertToScreen(button.convert(button.bounds, to: nil))
+        let anchorX = (icon.midX - panel.frame.minX).rounded()
+        guard anchorX != canvas.anchorX else { return }
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) { canvas.anchorX = anchorX }
     }
 
     private func render() {
         let entries = model.menuBarEntries
         let image = MenuBarImage.make(entries: entries)
         item.button?.image = image
+        // The button takes its new width on the next layout pass.
+        DispatchQueue.main.async { [weak self] in self?.realign() }
         item.button?.setAccessibilityLabel(
             entries.isEmpty ? "Burn"
                 : entries.map { "\($0.provider.name) \(Format.remaining($0.percent)) left" }.joined(separator: ", "))
