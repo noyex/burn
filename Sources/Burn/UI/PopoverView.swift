@@ -2,6 +2,8 @@ import SwiftUI
 
 struct PopoverView: View {
     let model: AppModel
+    /// Reports the size the panel should have, as soon as layout settles on it.
+    var onResize: (CGSize) -> Void = { _ in }
     @State private var showingSettings = false
     @State private var selection: Set<URL> = []
     @State private var confirmingClear = false
@@ -37,6 +39,8 @@ struct PopoverView: View {
         // fall through to the window below and close the panel.
         .background(Color.black.opacity(0.001))
         .padding(Bento.shadowInset)
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { onResize($0) }
         // Pinned to the top, so the content stays put while the panel is still taller than it.
         .frame(maxHeight: .infinity, alignment: .top)
         .foregroundStyle(theme.text)
