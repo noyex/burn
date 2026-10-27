@@ -12,6 +12,7 @@ final class StatusItemController: NSObject {
     private var workspaceObservers: [NSObjectProtocol] = []
     private var isOpen = false
     private var pendingShrink: DispatchWorkItem?
+    private var resizeObserver: NSObjectProtocol?
     /// Bumped on every open so a fade-out that finishes late doesn't hide a reopened panel.
     private var generation = 0
 
@@ -22,12 +23,14 @@ final class StatusItemController: NSObject {
         host.sizingOptions = .preferredContentSize
         host.view.wantsLayer = true
         host.view.layer?.backgroundColor = .clear
-        // The hosting view sits in a plain container so `layout` decides where it goes,
-        // not the window: while the panel resizes, the content stays put.
-        let container = NSView()
-        container.addSubview(host.view)
-        panel.contentView = container
+        panel.contentView = host.view
         panel.onCancel = { [weak self] in self?.close() }
+        // Whatever resizes the panel (expanding the shelf, the hosting view itself),
+        // it must not end up past the edge of the screen.
+        resizeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification, object: panel, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.keepOnScreen() }
+        }
         sizeObservation = host.observe(\.preferredContentSize) { [weak self] _, _ in
             MainActor.assumeIsolated { self?.resize() }
         }
@@ -97,20 +100,13 @@ final class StatusItemController: NSObject {
         workspaceObservers = []
     }
 
-    /// Grows the panel at once to cover both the old and the new content, and shrinks it to
-    /// the new size only after SwiftUI has animated the content, so nothing is clipped or
-    /// jumps mid-animation. Every frame is kept on screen.
+    /// Grows the panel at once, but shrinks it only after SwiftUI has animated the content
+    /// down, so the content isn't clipped mid-animation.
     private func resize() {
         pendingShrink?.cancel()
-        let target = targetFrame
-        guard isOpen, panel.isVisible else { return layout(window: target, content: target) }
-        let grown = panel.frame.union(target)
-        layout(window: grown, content: target)
-        guard grown != target else { return }
-        let shrink = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.layout(window: self.targetFrame, content: self.targetFrame)
-        }
+        let size = contentSize
+        guard size.width < panel.frame.width || size.height < panel.frame.height else { return place() }
+        let shrink = DispatchWorkItem { [weak self] in self?.place() }
         pendingShrink = shrink
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: shrink)
     }
@@ -120,31 +116,27 @@ final class StatusItemController: NSObject {
         return size == .zero ? host.view.fittingSize : size
     }
 
-    /// Where the panel goes for the current content: under the menu bar icon, top edge
-    /// fixed, kept on screen.
-    private var targetFrame: NSRect {
+    /// Hangs the panel under the menu bar icon, top edge fixed, kept on screen.
+    private func place() {
         guard let button = item.button, let window = button.window,
-              let screen = window.screen ?? NSScreen.main else { return panel.frame }
+              let screen = window.screen ?? NSScreen.main else { return }
         let size = contentSize
         let icon = window.convertToScreen(button.convert(button.bounds, to: nil))
         let visible = screen.visibleFrame
         let x = min(max(icon.midX - size.width / 2, visible.minX), visible.maxX - size.width)
-        return NSRect(x: x, y: icon.minY - 2 - size.height, width: size.width, height: size.height)
+        panel.setFrame(NSRect(x: x, y: icon.minY - 2 - size.height, width: size.width, height: size.height),
+                       display: true)
     }
 
-    private func place() {
-        pendingShrink?.cancel()
-        layout(window: targetFrame, content: targetFrame)
-    }
-
-    /// Sets the panel to `window` and hangs the content from its top, centered on where it
-    /// belongs (`content`). The hosting view is exactly as tall as the content, so SwiftUI
-    /// doesn't center it vertically, and wide enough to cover the panel while it animates.
-    private func layout(window frame: NSRect, content target: NSRect) {
-        if panel.frame != frame { panel.setFrame(frame, display: true) }
-        let half = max(target.midX - frame.minX, frame.maxX - target.midX)
-        host.view.frame = NSRect(x: target.midX - frame.minX - half, y: frame.height - target.height,
-                                 width: half * 2, height: target.height)
+    /// Slides the panel back inside the screen horizontally, keeping its size and top edge.
+    private func keepOnScreen() {
+        guard let screen = item.button?.window?.screen ?? panel.screen ?? NSScreen.main else { return }
+        let visible = screen.visibleFrame
+        var frame = panel.frame
+        let x = min(max(frame.minX, visible.minX), visible.maxX - frame.width)
+        guard x != frame.minX else { return }
+        frame.origin.x = x
+        panel.setFrame(frame, display: true)
     }
 
     private func render() {
