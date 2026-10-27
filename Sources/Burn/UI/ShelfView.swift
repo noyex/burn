@@ -8,6 +8,7 @@ struct ShelfView: View {
     let columns: Int
     let maxHeight: CGFloat
     @Binding var selection: Set<URL>
+    @Environment(\.colorScheme) private var scheme
 
     private let spacing: CGFloat = 8
     private var tileWidth: CGFloat { (width - spacing * CGFloat(columns - 1)) / CGFloat(columns) }
@@ -15,19 +16,21 @@ struct ShelfView: View {
 
     var body: some View {
         if shelf.items.isEmpty {
+            let theme = Theme(scheme)
             VStack(spacing: 6) {
                 Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 26, weight: .light))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 24, weight: .light))
+                    .foregroundStyle(theme.secondary)
                 Text("Screenshots you copy show up here")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .font(.brand(12))
+                    .foregroundStyle(theme.text)
                 Text("⌃⇧⌘4")
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 11).monospaced())
+                    .foregroundStyle(theme.secondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 36)
+            .background(theme.neutral, in: Bento.blockShape)
         } else {
             let rows = (shelf.items.count + columns - 1) / columns
             let contentHeight = CGFloat(rows) * (tileHeight + spacing) - spacing
@@ -91,7 +94,7 @@ private struct ShelfTile: View {
     @State private var copiedReset: Task<Void, Never>?
 
     private static let checkbox: CGFloat = 26
-    private let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+    private let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
 
     var body: some View {
         ZStack {
@@ -102,7 +105,7 @@ private struct ShelfTile: View {
                     .scaledToFill()
                     .frame(width: size.width, height: size.height)
             } else {
-                Rectangle().fill(.quinary)
+                Rectangle().fill(.quaternary)
             }
             if copied {
                 Label("Copied", systemImage: "checkmark")

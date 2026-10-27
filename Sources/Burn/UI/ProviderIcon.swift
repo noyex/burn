@@ -37,13 +37,14 @@ extension ProviderID {
 struct ProviderGlyph: View {
     let provider: ProviderID
     var size: CGFloat = 14
+    var color: Color?
 
     var body: some View {
         Image(nsImage: ProviderIcon.image(provider))
             .renderingMode(.template)
             .resizable()
             .frame(width: size, height: size)
-            .foregroundStyle(provider.iconTint)
+            .foregroundStyle(color ?? provider.iconTint)
             .accessibilityHidden(true)
     }
 }
