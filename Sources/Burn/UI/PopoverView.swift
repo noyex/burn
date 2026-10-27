@@ -117,7 +117,7 @@ struct PopoverView: View {
 
     private func providerBlock(_ p: ProviderID, hero: Bool) -> some View {
         ProviderBlock(provider: p, state: model.limits[p] ?? .loading,
-                      primaryID: model.limits[p]?.limits.flatMap { model.menuBarWindow(for: $0)?.id }, hero: hero)
+                      primary: model.limits[p]?.limits.flatMap { model.menuBarWindow(for: $0) }, hero: hero)
             .frame(maxHeight: .infinity)
     }
 

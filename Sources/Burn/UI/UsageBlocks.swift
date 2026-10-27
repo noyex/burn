@@ -28,7 +28,7 @@ struct ProviderBlock: View {
     let provider: ProviderID
     let state: LimitState
     /// Window shown big; the one the menu bar shows.
-    let primaryID: String?
+    let primary: LimitWindow?
     let hero: Bool
 
     @Environment(\.colorScheme) private var scheme
@@ -38,8 +38,11 @@ struct ProviderBlock: View {
 
     var body: some View {
         Group {
-            if let limits = state.limits, let primary = primary(limits) {
+            if let limits = state.limits, let primary {
                 content(limits, primary: primary)
+            } else if let limits = state.limits {
+                // Loaded but no windows reported: nothing to pulse for.
+                header(plan: limits.plan, primary: nil)
             } else {
                 skeleton
             }
@@ -47,10 +50,6 @@ struct ProviderBlock: View {
         .frame(maxWidth: .infinity, minHeight: hero ? 96 : 92, alignment: .topLeading)
         .block(theme.fill(provider))
         .accessibilityElement(children: .combine)
-    }
-
-    private func primary(_ l: ProviderLimits) -> LimitWindow? {
-        l.windows.first { $0.id == primaryID } ?? l.windows.max { $0.percent < $1.percent }
     }
 
     private func content(_ limits: ProviderLimits, primary: LimitWindow) -> some View {
@@ -85,7 +84,8 @@ struct ProviderBlock: View {
                     .opacity(0.7)
                     .help(message)
                     .accessibilityLabel(message)
-            } else if let primary, MenuBarImage.Level(primary.percent) != .normal {
+            }
+            if let primary, MenuBarImage.Level(primary.percent) != .normal {
                 alertPill(MenuBarImage.Level(primary.percent) == .full ? "Empty" : "Low", level: .init(primary.percent))
             }
         }
@@ -110,7 +110,7 @@ struct ProviderBlock: View {
         let reset = Format.reset(w.resetsAt)
         guard !reset.isEmpty else { return w.label }
         guard hero else { return "\(w.label) · \(reset)" }
-        return w.resetsAt.map { $0.timeIntervalSinceNow < 86400 } == true
+        return w.resetsAt.map { (1..<86400).contains($0.timeIntervalSinceNow) } == true
             ? "\(w.label) · resets in \(reset)" : "\(w.label) · resets \(reset)"
     }
 
@@ -130,7 +130,8 @@ struct ProviderBlock: View {
         HStack(spacing: 4) {
             Text(w.label).opacity(0.75)
             value(w, size: 11)
-            Text("· \(Format.reset(w.resetsAt))").opacity(0.75)
+            let reset = Format.reset(w.resetsAt)
+            if !reset.isEmpty { Text("· \(reset)").opacity(0.75) }
         }
         .font(.brand(11))
         .foregroundStyle(ink)
@@ -324,6 +325,8 @@ struct SpendBars: View {
                     bar(b, peak: peak, height: geo.size.height)
                 }
             }
+            // Keeps bars on the baseline even when the tallest is shorter than the frame (no spend).
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
             .scaleEffect(x: 1, y: grown ? 1 : 0.02, anchor: .bottom)
         }
         .onAppear {
