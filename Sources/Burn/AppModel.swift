@@ -42,6 +42,7 @@ final class AppModel {
 
     let settings = Settings()
     let shelf: ShelfStore
+    let updater = Updater()
 
     /// Called whenever something shown in the menu bar changes.
     @ObservationIgnored var onMenuBarChange: (() -> Void)?
@@ -64,6 +65,8 @@ final class AppModel {
         Task { await loadUsage(); await sync() }
         schedule(every: 120) { [weak self] in await self?.refreshLimits() }
         schedule(every: 300) { [weak self] in await self?.sync() }
+        Task { await updater.check() }
+        schedule(every: 86_400) { [weak self] in await self?.updater.check() }
     }
 
     func popoverOpened() {
