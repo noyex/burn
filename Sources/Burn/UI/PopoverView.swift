@@ -37,6 +37,9 @@ struct PopoverView: View {
         .scaleEffect(visible || reduceMotion ? 1 : 0.96, anchor: .top)
         .opacity(visible ? 1 : 0)
         .animation(visible ? .easeOut(duration: 0.2) : nil, value: visible)
+        // The panel can be bigger than the content while it resizes; keep the content
+        // hanging from the top instead of drifting to the middle.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var main: some View {
@@ -48,12 +51,18 @@ struct PopoverView: View {
                 if settings.tab == .shelf { expandButton }
             }
             .padding(.bottom, 2)
-            switch settings.tab {
-            case .usage: usage
-            case .shelf:
-                ShelfView(shelf: model.shelf, width: width,
-                          columns: expanded ? 4 : 2, maxHeight: expanded ? 560 : 380,
-                          selection: $selection)
+            // Stacked, so the outgoing tab fades out in place while the new one fades in.
+            ZStack(alignment: .top) {
+                switch settings.tab {
+                case .usage:
+                    VStack(alignment: .leading, spacing: Bento.gap) { usage }
+                        .transition(tabTransition)
+                case .shelf:
+                    ShelfView(shelf: model.shelf, width: width,
+                              columns: expanded ? 4 : 2, maxHeight: expanded ? 560 : 380,
+                              selection: $selection)
+                        .transition(tabTransition)
+                }
             }
             footer.padding(.top, 2)
         }
@@ -63,11 +72,15 @@ struct PopoverView: View {
         }
     }
 
+    private var tabTransition: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97, anchor: .top))
+    }
+
     private var expandButton: some View {
         let expanded = model.settings.shelfExpanded
         return RoundIconButton(systemName: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                                label: expanded ? "Make shelf smaller" : "Make shelf bigger", size: 36, floating: true) {
-            model.settings.shelfExpanded.toggle()
+            withAnimation(.snappy(duration: 0.25)) { model.settings.shelfExpanded.toggle() }
         }
     }
 
