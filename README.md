@@ -47,6 +47,7 @@ Run it again to update.
 1. Download [**Burn.dmg**](https://github.com/noyex/burn/releases/latest/download/Burn.dmg), open it and drag Burn into Applications.
 2. Open Burn. Burn isn't notarized by Apple, so the first time macOS says it can't verify the app.
    Click **Done**, then go to **System Settings → Privacy & Security** and click **Open Anyway** next to Burn.
+   On macOS 14, right-click Burn in Applications and choose **Open** instead.
 
 <details>
 <summary>Prefer the terminal for step 2?</summary>
@@ -111,7 +112,7 @@ Releasing: **Actions → Release → Run workflow** with a version like `v1.2.3`
 `Burn.zip` (`scripts/package.sh`) and publishes them as a GitHub release. `scripts/release.sh v1.2.3`
 does the same locally.
 
-Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports and pull requests are welcome: [open an issue](https://github.com/noyex/burn/issues/new/choose) or read [CONTRIBUTING.md](CONTRIBUTING.md) for how to send a PR.
 
 ## License
 

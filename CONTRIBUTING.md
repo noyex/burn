@@ -16,10 +16,32 @@ scripts/build-app.sh --install   # builds Burn.app, copies it to /Applications a
 
 ## Pull requests
 
-1. Fork the repo and create a branch: `feat/<short-name>`, `fix/<short-name>`.
-2. Keep the PR focused on one thing. Small PRs get merged faster.
-3. Make sure `scripts/build-app.sh --universal` builds and you ran the app with your change.
-4. Fill in the PR template.
+You can't push to this repo directly: every change goes through a pull request from your fork,
+and only the maintainer (@noyex) can approve and merge it.
+
+1. Fork the repo on GitHub, then clone your fork and create a branch:
+
+   ```sh
+   git clone https://github.com/<you>/burn.git
+   cd burn
+   git switch -c fix/<short-name>   # or feat/<short-name>
+   ```
+
+2. Make the change. Keep the PR focused on one thing: small PRs get merged faster.
+3. Check that it builds and works: `scripts/build-app.sh --universal`, then run the app with your change
+   (`scripts/build-app.sh --install`).
+4. Push the branch to your fork and open a PR against `noyex/burn` `main`
+   (GitHub shows a "Compare & pull request" button, or run `gh pr create --repo noyex/burn`).
+5. Fill in the PR template: what and why, how to test, screenshots for anything visible.
+
+### What happens next
+
+- On your first PR, the checks (build, title, screenshots) start only after a maintainer approves the run.
+  That's a GitHub safety rule for outside contributors, not a sign anything is wrong.
+- The maintainer reviews the PR. Pushing new commits after an approval needs a fresh approval.
+- All checks must pass and all review comments must be resolved before the PR can be merged.
+- PRs are squash-merged into `main` by the maintainer. A new release with your change follows when the
+  maintainer cuts one.
 
 ### Title
 
