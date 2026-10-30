@@ -136,6 +136,9 @@ private struct ShelfTile: View {
         }
         .frame(width: size.width, height: size.height)
         .clipShape(shape)
+        // A filled thumbnail overflows its tile; the clip is only visual, so without this a
+        // wide neighbor swallows clicks meant for this tile's checkbox.
+        .allowsHitTesting(false)
         .floating(Theme(scheme).neutral, in: shape)
         .overlay {
             shape.strokeBorder(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.white.opacity(0.12)),
