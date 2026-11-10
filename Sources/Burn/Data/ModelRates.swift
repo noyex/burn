@@ -69,8 +69,22 @@ struct ModelRates: Sendable {
         let key = Self.stripVariantSuffix(Self.normalizeKey(model))
         let bare = Self.bareName(key)
         if bare.isEmpty || Self.unpriceable.contains(bare) { return nil }
-        return table[key]
+        return table[key] ?? Self.builtin[key] ?? Self.builtin[bare]
     }
+
+    /// Anthropic list prices for models LiteLLM doesn't list yet; the table wins once it has them.
+    /// Bump `builtinVersion` on every change so stored costs get recomputed.
+    static let builtinVersion = "1"
+    static let builtin: [String: ModelRate] = {
+        func rate(_ input: Double, _ output: Double, cacheRead: Double, fast: Double?) -> ModelRate {
+            // Cache writes (5 min) cost 1.25x input.
+            let std = TokenRates(input: input / 1e6, output: output / 1e6,
+                                 cacheRead: cacheRead / 1e6, cacheCreation: input * 1.25 / 1e6)
+            return ModelRate(standard: std, fast: fast.map { std.scaled(by: $0) }, ultrafast: nil)
+        }
+        let fable52 = rate(8, 40, cacheRead: 0.2, fast: 2)
+        return ["claude-fable-5-2": fable52, "claude-mythos-5-2": fable52]
+    }()
 
     static func normalizeKey(_ model: String) -> String {
         model.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -214,6 +228,7 @@ struct ModelRates: Sendable {
         var hasher = SHA256()
         hasher.update(data: entry.digest)
         hasher.update(data: settings.raw)
+        hasher.update(data: Data(builtinVersion.utf8))
         let hash = hasher.finalize().map { String(format: "%02x", $0) }.joined()
         return ModelRates(table: entry.table, overrides: settings.overrides, aliases: settings.aliases, hash: hash)
     }
