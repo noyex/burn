@@ -79,7 +79,7 @@ struct ProviderBlock: View {
                     }
                 }
                 ForEach(others.filter(\.minor)) { w in
-                    smallSecondary(w).frame(maxWidth: .infinity, alignment: .trailing).padding(.top, 4)
+                    smallSecondary(w).padding(.top, 4)
                 }
             }
         }
