@@ -47,7 +47,7 @@ struct ClaudeLimitsFetcher: LimitsFetcher {
             let id = "week_" + name.lowercased().replacingOccurrences(of: " ", with: "_")
             if windows.contains(where: { $0.id == id }) { continue }
             windows.append(LimitWindow(id: id, label: name, percent: pct,
-                                       resetsAt: (l["resets_at"] as? String).flatMap(parseISODate)))
+                                       resetsAt: (l["resets_at"] as? String).flatMap(parseISODate), minor: true))
         }
         guard !windows.isEmpty else { throw LimitsError.badResponse }
 
