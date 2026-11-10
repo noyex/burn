@@ -34,10 +34,20 @@ struct ClaudeLimitsFetcher: LimitsFetcher {
             ("five_hour", "5h", "5h"), ("seven_day", "week", "Week"),
             ("seven_day_opus", "week_opus", "Opus"), ("seven_day_sonnet", "week_sonnet", "Sonnet"),
         ]
-        let windows = keys.compactMap { key, id, label -> LimitWindow? in
+        var windows = keys.compactMap { key, id, label -> LimitWindow? in
             guard let w = json[key] as? [String: Any], let pct = jsonDouble(w["utilization"]) else { return nil }
             return LimitWindow(id: id, label: label, percent: pct,
                                resetsAt: (w["resets_at"] as? String).flatMap(parseISODate))
+        }
+        // Per-model weekly caps (e.g. Fable) only come in the newer `limits` array.
+        for l in json["limits"] as? [[String: Any]] ?? [] {
+            guard l["kind"] as? String == "weekly_scoped", let pct = jsonDouble(l["percent"]),
+                  let model = (l["scope"] as? [String: Any])?["model"] as? [String: Any],
+                  let name = model["display_name"] as? String, !name.isEmpty else { continue }
+            let id = "week_" + name.lowercased().replacingOccurrences(of: " ", with: "_")
+            if windows.contains(where: { $0.id == id }) { continue }
+            windows.append(LimitWindow(id: id, label: name, percent: pct,
+                                       resetsAt: (l["resets_at"] as? String).flatMap(parseISODate)))
         }
         guard !windows.isEmpty else { throw LimitsError.badResponse }
 
