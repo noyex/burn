@@ -72,14 +72,16 @@ struct ProviderBlock: View {
                 header(plan: limits.plan, primary: primary)
                 Spacer(minLength: 10)
                 HStack(alignment: .bottom) {
-                    primaryStack(primary, size: 52)
+                    VStack(alignment: .leading, spacing: 0) {
+                        primaryStack(primary, size: 52)
+                        ForEach(others.filter(\.minor)) { w in
+                            smallSecondary(w).padding(.top, 4)
+                        }
+                    }
                     Spacer(minLength: 8)
                     HStack(alignment: .bottom, spacing: 14) {
                         ForEach(others.filter { !$0.minor }) { heroSecondary($0) }
                     }
-                }
-                ForEach(others.filter(\.minor)) { w in
-                    smallSecondary(w).padding(.top, 4)
                 }
             }
         }
