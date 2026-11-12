@@ -32,6 +32,8 @@ struct LimitWindow: Identifiable, Hashable, Sendable {
     /// 0...100 (may exceed 100 if the provider reports overage).
     let percent: Double
     let resetsAt: Date?
+    /// A narrower cap (e.g. one model's weekly limit) shown as a small line, not a big number.
+    var minor = false
 }
 
 struct ProviderLimits: Sendable {
