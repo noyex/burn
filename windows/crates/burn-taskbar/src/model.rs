@@ -1,7 +1,7 @@
 //! What the widget shows, independent of how it is drawn. Mirrors the Mac menu bar
 //! (`MenuBarImage` in StatusItemController.swift).
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Provider {
     Claude,
     Codex,

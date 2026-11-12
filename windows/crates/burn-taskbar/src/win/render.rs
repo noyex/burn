@@ -1,7 +1,10 @@
 //! Direct2D/DirectWrite drawing: the taskbar widget into a premultiplied 32-bit DIB (for
 //! `UpdateLayeredWindow`), the placeholder panel into any render target.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::ffi::c_void;
+use std::rc::Rc;
 
 use windows::Win32::Foundation::RECT;
 use windows::Win32::Graphics::Direct2D::Common::{
@@ -17,7 +20,7 @@ use windows::Win32::Graphics::DirectWrite::{
     DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_FEATURE, DWRITE_FONT_FEATURE_TAG_TABULAR_FIGURES,
     DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT, DWRITE_FONT_WEIGHT_MEDIUM,
     DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_TEXT_METRICS, DWRITE_TEXT_RANGE,
-    DWriteCreateFactory, IDWriteFactory, IDWriteTextLayout,
+    DWriteCreateFactory, IDWriteFactory, IDWriteTextFormat, IDWriteTextLayout,
 };
 use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
 use windows::Win32::Graphics::Gdi::{
@@ -113,6 +116,21 @@ fn logo_svg(provider: Provider) -> &'static str {
     }
 }
 
+type LogoKey = (Provider, [u8; 4], u32);
+
+thread_local! {
+    /// Rasterized logos, so a redraw (every hover change) doesn't re-parse the SVGs.
+    static LOGOS: RefCell<HashMap<LogoKey, Option<Rc<Vec<u8>>>>> = RefCell::new(HashMap::new());
+}
+
+fn cached_logo(provider: Provider, color: Rgba, px: u32) -> Option<Rc<Vec<u8>>> {
+    let c = |v: f32| (v * 255.0).round() as u8;
+    let key = (provider, [c(color.0), c(color.1), c(color.2), c(color.3)], px);
+    LOGOS.with(|cache| {
+        cache.borrow_mut().entry(key).or_insert_with(|| logo_pixels(provider, color, px).map(Rc::new)).clone()
+    })
+}
+
 /// The logo at `px`×`px`, filled with `color`, as premultiplied BGRA rows.
 fn logo_pixels(provider: Provider, color: Rgba, px: u32) -> Option<Vec<u8>> {
     let svg = logo_svg(provider).replacen("<svg ", &format!("<svg fill=\"{}\" ", color.svg()), 1);
@@ -134,7 +152,7 @@ fn logo_pixels(provider: Provider, color: Rgba, px: u32) -> Option<Vec<u8>> {
 /// Draws a logo with its top-left corner at (`x`, `y`) DIPs, snapped to device pixels.
 fn draw_logo(rt: &ID2D1RenderTarget, provider: Provider, color: Rgba, x: f32, y: f32, size: f32, scale: f32) {
     let px = (size * scale).round().max(1.0) as u32;
-    let Some(pixels) = logo_pixels(provider, color, px) else { return };
+    let Some(pixels) = cached_logo(provider, color, px) else { return };
     let dpi = 96.0 * scale;
     let props = D2D1_BITMAP_PROPERTIES {
         pixelFormat: D2D1_PIXEL_FORMAT { format: DXGI_FORMAT_B8G8R8A8_UNORM, alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED },
@@ -191,6 +209,7 @@ pub struct Painter {
     d2d: ID2D1Factory,
     dwrite: IDWriteFactory,
     family: PCWSTR,
+    formats: RefCell<HashMap<(u32, i32), IDWriteTextFormat>>,
 }
 
 impl Painter {
@@ -203,13 +222,16 @@ impl Painter {
         } else {
             w!("Segoe UI")
         };
-        Ok(Painter { d2d, dwrite, family })
+        Ok(Painter { d2d, dwrite, family, formats: RefCell::default() })
     }
 
-    fn layout(&self, text: &str, size: f32, weight: DWRITE_FONT_WEIGHT, tabular: bool) -> Result<IDWriteTextLayout> {
-        let utf16: Vec<u16> = text.encode_utf16().collect();
-        unsafe {
-            let format = self.dwrite.CreateTextFormat(
+    fn format(&self, size: f32, weight: DWRITE_FONT_WEIGHT) -> Result<IDWriteTextFormat> {
+        let key = (size.to_bits(), weight.0);
+        if let Some(format) = self.formats.borrow().get(&key) {
+            return Ok(format.clone());
+        }
+        let format = unsafe {
+            self.dwrite.CreateTextFormat(
                 self.family,
                 None,
                 weight,
@@ -217,7 +239,16 @@ impl Painter {
                 DWRITE_FONT_STRETCH_NORMAL,
                 size,
                 w!("en-us"),
-            )?;
+            )?
+        };
+        self.formats.borrow_mut().insert(key, format.clone());
+        Ok(format)
+    }
+
+    fn layout(&self, text: &str, size: f32, weight: DWRITE_FONT_WEIGHT, tabular: bool) -> Result<IDWriteTextLayout> {
+        let utf16: Vec<u16> = text.encode_utf16().collect();
+        unsafe {
+            let format = self.format(size, weight)?;
             let layout = self.dwrite.CreateTextLayout(&utf16, &format, 4096.0, 512.0)?;
             if tabular {
                 let typography = self.dwrite.CreateTypography()?;

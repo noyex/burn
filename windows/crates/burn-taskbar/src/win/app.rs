@@ -3,7 +3,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
 use windows::Win32::Foundation::{
-    COLORREF, ERROR_ALREADY_EXISTS, GetLastError, HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM,
+    COLORREF, D2DERR_RECREATE_TARGET, ERROR_ALREADY_EXISTS, GetLastError, HINSTANCE, HWND, LPARAM, LRESULT, POINT,
+    RECT, SIZE, WPARAM,
 };
 use windows::Win32::Graphics::Direct2D::Common::{D2D_SIZE_U, D2D1_ALPHA_MODE_IGNORE, D2D1_PIXEL_FORMAT};
 use windows::Win32::Graphics::Direct2D::{
@@ -106,16 +107,15 @@ struct App {
 }
 
 pub fn run() {
-    init_log();
-    log!("Burn spike {} on {}", env!("CARGO_PKG_VERSION"), os_description());
-    log!("log file: {}", log_path().display());
-
     unsafe {
+        // Before the log is opened: a second launch must not truncate the running one's log.
         let _mutex = CreateMutexW(None, true, w!("Local\\BurnSpikeSingleInstance"));
         if GetLastError() == ERROR_ALREADY_EXISTS {
-            log!("another instance is running, exiting");
             return;
         }
+        init_log();
+        log!("Burn spike {} on {}", env!("CARGO_PKG_VERSION"), os_description());
+        log!("log file: {}", log_path().display());
         // The manifest already asks for this; it fails harmlessly when that took effect.
         let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
@@ -280,20 +280,28 @@ impl App {
     fn draw(&mut self, widget: HWND, key: DrawKey) {
         let taskbar = key.taskbar;
         let scale = taskbar.dpi as f32 / 96.0;
-        let thickness = if taskbar.edge.is_horizontal() { taskbar.thickness() } else { (48.0 * scale) as i32 };
-        let frame = match self.painter.widget(self.entries(), taskbar.dpi, thickness, key.light, key.hovered) {
+        if !taskbar.edge.is_horizontal() {
+            // Only Windows 10 docks the taskbar sideways; a one-row widget doesn't fit there.
+            log!("vertical taskbar ({:?}) isn't supported yet, tray icon only", taskbar.edge);
+            unsafe {
+                let _ = ShowWindow(widget, SW_HIDE);
+            }
+            self.drawn = Some(key);
+            return;
+        }
+        let frame = match self.painter.widget(self.entries(), taskbar.dpi, taskbar.thickness(), key.light, key.hovered)
+        {
             Ok(f) => f,
             Err(e) => {
                 log!("rendering the widget failed: {e:?}");
                 return;
             }
         };
-        let size = if taskbar.edge.is_horizontal() { (frame.width, frame.height) } else { (frame.height, frame.width) };
         let rect = widget_rect(
             taskbar.rect,
             taskbar.tray,
             taskbar.edge,
-            size,
+            (frame.width, frame.height),
             (WIDGET_GAP * scale).round() as i32,
             (FALLBACK_TRAY * scale).round() as i32,
         );
@@ -303,6 +311,7 @@ impl App {
             SourceConstantAlpha: 255,
             AlphaFormat: AC_SRC_ALPHA as u8,
         };
+        let mut placed = true;
         unsafe {
             // Content first, then show, so the widget never appears empty.
             if let Err(e) = UpdateLayeredWindow(
@@ -317,6 +326,7 @@ impl App {
                 ULW_ALPHA,
             ) {
                 log!("UpdateLayeredWindow failed: {e:?}");
+                placed = false;
             }
             if let Err(e) = SetWindowPos(
                 widget,
@@ -328,6 +338,7 @@ impl App {
                 SWP_NOACTIVATE | SWP_SHOWWINDOW,
             ) {
                 log!("SetWindowPos failed: {e:?}");
+                placed = false;
             }
         }
         if self.widget_rect != Some(rect) || self.drawn.map(|d| d.light) != Some(key.light) {
@@ -341,7 +352,8 @@ impl App {
             );
         }
         self.widget_rect = Some(rect);
-        self.drawn = Some(key);
+        // A failed draw is retried on the next tick.
+        self.drawn = placed.then_some(key);
     }
 
     fn create_widget(&mut self, taskbar: HWND) -> Option<HWND> {
@@ -436,6 +448,10 @@ impl App {
 
     fn show_menu(&mut self) {
         unsafe {
+            // The menu's modal loop runs while the state is borrowed, so messages that need
+            // it (hover leave, the panel's deactivation) are dropped: close the panel first
+            // and reset the hover afterwards.
+            self.hide_panel();
             let Ok(menu) = CreatePopupMenu() else { return };
             let _ = AppendMenuW(menu, MF_STRING, CMD_NEXT_DEMO, w!("Next demo values"));
             let _ = AppendMenuW(menu, MF_STRING, CMD_OPEN_LOG, w!("Open log"));
@@ -458,14 +474,13 @@ impl App {
             );
             let _ = PostMessageW(Some(self.host), WM_NULL, WPARAM(0), LPARAM(0));
             let _ = DestroyMenu(menu);
+            self.hovered = false;
+            self.refresh(false);
             match cmd.0 as usize {
                 CMD_NEXT_DEMO => {
                     self.demo = (self.demo + 1) % self.sets.len();
                     log!("demo values set {}", self.demo);
                     self.refresh(true);
-                    if self.panel_visible {
-                        let _ = InvalidateRect(Some(self.panel), None, false);
-                    }
                 }
                 CMD_OPEN_LOG => {
                     let path = wide(&log_path().to_string_lossy());
@@ -491,7 +506,7 @@ impl App {
     fn on_taskbar_created(&mut self) {
         log!("TaskbarCreated: Explorer restarted, re-adding the tray icon and the widget");
         self.add_tray_icon();
-        self.widget = None;
+        // refresh() replaces the widget if it went down with the old taskbar.
         self.taskbar = None;
         self.refresh(true);
     }
@@ -606,10 +621,18 @@ impl App {
         unsafe {
             rt.SetDpi(dpi as f32, dpi as f32);
             rt.BeginDraw();
-            let drawn = self.painter.panel(&target, self.entries(), light, PANEL_WIDTH, scale, Some(palette.panel));
+            let mut client = RECT::default();
+            let _ = GetClientRect(self.panel, &mut client);
+            let width = client.right as f32 / scale;
+            let drawn = self.painter.panel(&target, self.entries(), light, width, scale, Some(palette.panel));
             if let Err(e) = rt.EndDraw(None, None).and(drawn) {
                 log!("panel draw failed: {e:?}");
                 self.panel_rt = None;
+                // A lost device needs a new target and another paint; anything else would
+                // just fail again.
+                if e.code() == D2DERR_RECREATE_TARGET {
+                    let _ = InvalidateRect(Some(self.panel), None, false);
+                }
             }
         }
     }
