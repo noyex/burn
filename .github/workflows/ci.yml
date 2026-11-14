@@ -20,5 +20,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: No hardcoded colors outside the theme
+        run: scripts/check-theme-literals.sh
+      - name: Test
+        run: swift test
       - name: Build universal Burn.app
         run: scripts/build-app.sh --universal
