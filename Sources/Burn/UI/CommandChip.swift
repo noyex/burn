@@ -20,7 +20,7 @@ struct CommandChip: View {
                 Text(command).font(.system(size: 11, design: .monospaced))
                 Image(systemName: copied ? "checkmark" : "doc.on.doc")
                     .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                    .opacity(0.6)
                     .frame(width: 12)
             }
             .padding(.horizontal, 7)

@@ -14,7 +14,8 @@ final class PanelCanvas {
 struct PopoverView: View {
     let model: AppModel
     let canvas: PanelCanvas
-    @State private var showingSettings = false
+    /// `--settings` opens the preview window on Settings, for screenshots.
+    @State private var showingSettings = CommandLine.arguments.contains("--settings")
     @State private var selection: Set<URL> = []
     @State private var confirmingClear = false
     @State private var copiedSelection = false
@@ -65,7 +66,7 @@ struct PopoverView: View {
         .frame(width: width)
         // Nearly invisible, but catches clicks in the gaps between blocks so they don't
         // fall through to the window below and close the panel.
-        .background(Color.black.opacity(0.001))
+        .background(Theme.hitArea)
         .padding(Bento.shadowInset)
         .fixedSize(horizontal: false, vertical: true)
         .hoverTipHost()
@@ -150,7 +151,7 @@ struct PopoverView: View {
             signIn.reveal(visible, index: 0)
         } else {
             if !cards.isEmpty {
-                CardGrid(rows: rows) {
+                CardGrid(rows: rows, spacing: Bento.gap) {
                     ForEach(cards) { p in
                         card(p, size: sizes[p] ?? .m)
                             .reveal(visible, index: rows.firstIndex { $0.contains(p) } ?? 0)
@@ -197,10 +198,10 @@ struct PopoverView: View {
             ProgressView(value: Double(pct), total: 100) {
                 Text("Importing usage from Claude Code and Codex logs…").font(.brand(11))
             }
-            .tint(Theme.limeInk)
+            .tint(theme.accentInk)
             .controlSize(.small)
-            .foregroundStyle(Theme.limeInk)
-            .block(Theme.lime)
+            .foregroundStyle(theme.accentInk)
+            .block(theme.accent)
         }
     }
 

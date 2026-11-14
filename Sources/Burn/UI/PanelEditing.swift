@@ -5,7 +5,7 @@ import SwiftUI
 /// a lone M take the full width. One flat layout, so cards slide when they change rows.
 struct CardGrid: Layout {
     let rows: [[ProviderID]]
-    var spacing = Bento.gap
+    let spacing: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.width ?? 304

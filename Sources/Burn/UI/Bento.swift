@@ -1,10 +1,13 @@
 import SwiftUI
 
 /// Shared building blocks of the bento look.
+@MainActor
 enum Bento {
-    static let blockRadius: CGFloat = 14
-    static let gap: CGFloat = 6
-    static let blockShape = RoundedRectangle(cornerRadius: blockRadius, style: .continuous)
+    static var blockRadius: CGFloat { ThemeStore.shared.theme.radius }
+    static var gap: CGFloat { ThemeStore.shared.theme.gap }
+    static var blockShape: RoundedRectangle { RoundedRectangle(cornerRadius: blockRadius, style: .continuous) }
+    /// Corners of small floating pieces: never rounder than the blocks.
+    static var smallShape: RoundedRectangle { RoundedRectangle(cornerRadius: min(blockRadius, 8), style: .continuous) }
     /// Room around the panel's content for the blocks' shadows.
     static let shadowInset = EdgeInsets(top: 6, leading: 14, bottom: 18, trailing: 14)
 }
@@ -107,7 +110,7 @@ struct PillSegmented<Value: Hashable>: View {
     }
 }
 
-/// Dark capsule of icon tabs whose highlight slides between them.
+/// Capsule of icon tabs whose highlight slides between them.
 struct IconSwitcher: View {
     @Binding var selection: PopoverTab
 
@@ -124,12 +127,12 @@ struct IconSwitcher: View {
                 } label: {
                     Image(systemName: tab.symbol)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(selected ? 1 : 0.5))
+                        .foregroundStyle(theme.switcherInk.opacity(selected ? 1 : 0.5))
                         .frame(width: 40, height: 30)
                         .background {
                             if selected {
                                 Capsule()
-                                    .fill(.white.opacity(0.16))
+                                    .fill(theme.switcherInk.opacity(0.16))
                                     .matchedGeometryEffect(id: "selection", in: namespace)
                             }
                         }
@@ -193,7 +196,7 @@ struct PillButtonStyle: ButtonStyle {
         let theme = Theme(scheme)
         configuration.label
             .font(.brand(12, prominent ? .bold : .medium))
-            .foregroundStyle(prominent ? theme.base : destructive ? .red : theme.text)
+            .foregroundStyle(prominent ? theme.base : destructive ? theme.danger : theme.text)
             .padding(.horizontal, 11)
             .frame(height: 26)
             .background(prominent ? theme.text : theme.neutral, in: Capsule())

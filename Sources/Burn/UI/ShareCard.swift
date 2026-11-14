@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// A shareable image of the period's spend, drawn in the same bento style as the popover.
-/// Always light, so it looks the same wherever it's pasted.
+/// Always the light side of the theme, so it looks the same wherever it's pasted.
 struct ShareCard: View {
     let usage: UsageSummary
 
@@ -54,14 +54,14 @@ struct ShareCard: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
             Text("\(Format.tokens(usage.tokens)) tokens").font(.brand(13)).opacity(0.7)
-            SpendBars(usage: usage, ink: Theme.limeInk, animated: false)
+            SpendBars(usage: usage, ink: theme.accentInk, animated: false)
                 .frame(height: 52)
                 .padding(.top, 14)
         }
-        .foregroundStyle(Theme.limeInk)
+        .foregroundStyle(theme.accentInk)
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Theme.lime, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(theme.accent, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func providerSpend(_ p: ProviderID, cost: Double) -> some View {

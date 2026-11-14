@@ -307,9 +307,12 @@ struct Pulse<Content: View>: View {
 
 // MARK: - Spend
 
-/// What the period's usage would have cost at API prices, on a lime block.
+/// What the period's usage would have cost at API prices, on the accent block.
 struct SpendBlock: View {
     let model: AppModel
+    @Environment(\.colorScheme) private var scheme
+
+    private var theme: Theme { Theme(scheme) }
 
     var body: some View {
         @Bindable var model = model
@@ -320,8 +323,8 @@ struct SpendBlock: View {
                     .hoverTip("Estimated at API list prices")
                 Spacer()
                 PillSegmented(options: Period.allCases, selection: $model.period,
-                              style: .init(track: Theme.limeInk.opacity(0.08), selected: Theme.limeInk,
-                                           selectedText: Theme.lime, text: Theme.limeInk.opacity(0.7)),
+                              style: .init(track: theme.accentInk.opacity(0.08), selected: theme.accentInk,
+                                           selectedText: theme.accent, text: theme.accentInk.opacity(0.7)),
                               compact: true, accessibilityLabel: "Period") { $0.title }
             }
             if let usage = model.usage {
@@ -332,8 +335,8 @@ struct SpendBlock: View {
                 placeholder
             }
         }
-        .foregroundStyle(Theme.limeInk)
-        .block(Theme.lime)
+        .foregroundStyle(theme.accentInk)
+        .block(theme.accent)
     }
 
     @ViewBuilder
@@ -356,7 +359,7 @@ struct SpendBlock: View {
                 .monospacedDigit()
                 .opacity(0.7)
         }
-        SpendBars(usage: usage, ink: Theme.limeInk)
+        SpendBars(usage: usage, ink: theme.accentInk)
             .id(usage.period)
             .frame(height: 38)
             .padding(.top, 10)
@@ -373,8 +376,8 @@ struct SpendBlock: View {
     private var placeholder: some View {
         Pulse {
             VStack(alignment: .leading, spacing: 10) {
-                Capsule().fill(Theme.limeInk.opacity(0.14)).frame(width: 120, height: 34)
-                Capsule().fill(Theme.limeInk.opacity(0.1)).frame(maxWidth: .infinity).frame(height: 38)
+                Capsule().fill(theme.accentInk.opacity(0.14)).frame(width: 120, height: 34)
+                Capsule().fill(theme.accentInk.opacity(0.1)).frame(maxWidth: .infinity).frame(height: 38)
             }
         }
         .padding(.top, 10)
