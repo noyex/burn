@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 NAMED='white|black|red|orange|yellow|green|blue|purple|pink|gray|brown|cyan|mint|teal|indigo|primary|secondary|tertiary|quaternary'
-PATTERN="Color\((hex|red|white|\.sRGB|\.displayP3)|NSColor\(|NSColor\.system|[(, :?]\.($NAMED)\b|Color\.($NAMED)\b|\.(system[A-Z][A-Za-z]*|labelColor|[a-z][A-Za-z]*LabelColor|textColor|windowBackgroundColor|controlAccentColor)\b|#[0-9A-Fa-f]{6}\b|Capsule\(\)"
+PATTERN="Color\((hex|red|white|\.sRGB|\.displayP3)|NSColor\(|NSColor\.system|[(, :?]\.($NAMED)\b|Color\.($NAMED)\b|\.(system[A-Z][A-Za-z]*|labelColor|[a-z][A-Za-z]*LabelColor|textColor|windowBackgroundColor|controlAccentColor)\b|#[0-9A-Fa-f]{6}\b|Capsule\(\)|\(\.tint\)|accentColor"
 
 hits="$(grep -rnE "$PATTERN" Sources/Burn --include='*.swift' \
   | grep -vE '^Sources/Burn/UI/(Theme|ThemeSpec)\.swift:' \

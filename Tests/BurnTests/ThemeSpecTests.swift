@@ -91,6 +91,19 @@ struct ThemeSpecTests {
         #expect(theme.backgrounds.isEmpty)
     }
 
+    @Test func hugeNumbersAreClampedNotFatal() {
+        let (theme, issues) = parse(##"{"shape": {"radius": 1e30, "gap": -1e30}}"##)
+        #expect(issues.count == 2)
+        #expect(theme.radius == 24)
+        #expect(theme.gap == 2)
+    }
+
+    @Test func systemTokensCannotPaintABackground() {
+        let (theme, issues) = parse(##"{"backgrounds": {"accent": {"gradient": {"colors": ["menubar-warn", "#000000"]}}}}"##)
+        #expect(issues.count == 1)
+        #expect(theme.backgrounds.isEmpty)
+    }
+
     @Test func brokenJSONFallsBackToTheBuiltInLook() {
         let (theme, issues) = parse("{ not json")
         #expect(issues.count == 1)

@@ -47,6 +47,8 @@ struct Theme {
     /// The spend block and other highlights.
     var accent: Color { color(.accent) }
     var accentInk: Color { color(.accentInk) }
+    /// Selected shelf tiles; the system accent color unless the theme sets one.
+    var selection: Color { ThemeStore.shared.theme.color(.selection, dark: dark).map(Color.init) ?? .accentColor }
     /// Destructive actions.
     var danger: Color { color(.danger) }
 

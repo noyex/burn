@@ -81,8 +81,9 @@ enum ThemeToken: String, CaseIterable, Sendable {
     case danger
     case menuBarWarn = "menubar-warn"
     case menuBarFull = "menubar-full"
+    case selection
 
-    /// Built-in value; nil means "the system color" (menu bar alerts).
+    /// Built-in value; nil means "the system color" (menu bar alerts, the selection ring).
     func standard(dark: Bool) -> RGBA? {
         func pick(_ light: UInt32, _ darkHex: UInt32) -> RGBA { RGBA(hex: dark ? darkHex : light) }
         switch self {
@@ -112,7 +113,7 @@ enum ThemeToken: String, CaseIterable, Sendable {
         case .warnOnDark: return RGBA(hex: 0xFFB340)
         case .fullOnDark: return RGBA(hex: 0xFF6B5E)
         case .danger: return pick(0xFF3B30, 0xFF453A)
-        case .menuBarWarn, .menuBarFull: return nil
+        case .menuBarWarn, .menuBarFull, .selection: return nil
         }
     }
 
@@ -131,9 +132,14 @@ struct BlockBackground: Equatable, Sendable {
         case token(ThemeToken)
 
         init?(_ string: String) {
-            if let color = RGBA(string) { self = .color(color) }
-            else if let token = ThemeToken(rawValue: string) { self = .token(token) }
-            else { return nil }
+            if let color = RGBA(string) {
+                self = .color(color)
+            } else if let token = ThemeToken(rawValue: string), token.standard(dark: false) != nil {
+                // Tokens that default to a system color have nothing to paint with.
+                self = .token(token)
+            } else {
+                return nil
+            }
         }
     }
 
@@ -197,6 +203,12 @@ struct ResolvedTheme: Equatable, Sendable {
 
     func color(_ token: ThemeToken, dark isDark: Bool) -> RGBA? {
         (isDark ? dark : light)[token] ?? token.standard(dark: isDark)
+    }
+
+    /// The `name` a theme file gives itself, without resolving the rest of it.
+    static func title(of data: Data) -> String? {
+        let name = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["name"] as? String
+        return name?.isEmpty == false ? name : nil
     }
 
     /// Reads a theme file. Never fails: anything it can't use is skipped and reported in `issues`.
@@ -381,6 +393,7 @@ struct ResolvedTheme: Equatable, Sendable {
     }
 
     private static func short(_ value: Double) -> String {
-        value == value.rounded() ? String(Int(value)) : String(value)
+        // %g never traps, however large the number in the file is.
+        String(format: "%g", value)
     }
 }

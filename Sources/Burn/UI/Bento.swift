@@ -42,6 +42,17 @@ extension View {
         modifier(Floating(fill: nil, slot: slot, shape: shape))
     }
 
+    /// Fills `shape` with a theme token and the background the theme gives it, without lifting it.
+    func themedFill<S: InsettableShape>(_ slot: ThemeToken, in shape: S, theme: Theme) -> some View {
+        background {
+            shape.fill(theme.color(slot)).overlay {
+                if let background = theme.background(slot) {
+                    BlockDecoration(background: background, theme: theme).clipShape(shape)
+                }
+            }
+        }
+    }
+
     /// Fades and lifts the view in when the popover opens, staggered by `index`.
     func reveal(_ visible: Bool, index: Int) -> some View {
         modifier(Reveal(visible: visible, index: index))

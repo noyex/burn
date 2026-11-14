@@ -8,7 +8,7 @@ your themes folder. Burn updates never touch that folder, so your themes stay as
 | File | What it is |
 |---|---|
 | `<name>.json` | A theme. One file per theme. |
-| `active.txt` | The name of the theme in use, without `.json`. Empty or `default` is the built-in look. |
+| `active.txt` | The name of the theme in use, without `.json`. Empty is the built-in look. |
 | `README.md` | This guide. Burn rewrites it on launch, so don't keep notes in it. |
 
 Burn watches the folder: save a file and the open panel changes within a second, no restart.
@@ -92,6 +92,7 @@ transparent to `FF` solid). Named colors and `rgb()` are not supported.
 | `danger` | `#FF3B30` | `#FF453A` | Destructive buttons, theme problems |
 | `menubar-warn` | `system` | `system` | Menu bar percentage at 20% left. Default: system orange |
 | `menubar-full` | `system` | `system` | Menu bar percentage at 0% left. Default: system red |
+| `selection` | `system` | `system` | Ring and checkmark on selected shelf screenshots. Default: the system accent color |
 
 Good to know:
 
@@ -147,7 +148,7 @@ cards), `neutral` (notices and empty states) and `surface` (the settings panel).
 | `pattern.fade` | none | `top`, `bottom` | Edge the pattern fades out toward |
 
 Any color here is `#RRGGBB`, `#RRGGBBAA`, or the name of a token (`"accent-ink"`), which then
-follows light and dark. Text sits on top of the background, so keep it calm enough to read: the
+follows light and dark (not the `system` ones). The share image uses the same backgrounds. Text sits on top of the background, so keep it calm enough to read: the
 block's `-ink` color must stay readable across the whole gradient or image.
 
 ## Fonts

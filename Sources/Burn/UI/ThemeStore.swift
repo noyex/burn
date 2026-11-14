@@ -34,7 +34,10 @@ final class ThemeStore {
     /// The menu bar is drawn outside SwiftUI and has to be told.
     @ObservationIgnored var onChange: (() -> Void)?
     @ObservationIgnored private var stream: FSEventStreamRef?
-    @ObservationIgnored private var images: [String: NSImage] = [:]
+    /// Pictures by file name; nil for one that couldn't be read, so it isn't retried on every draw.
+    @ObservationIgnored private var images: [String: NSImage?] = [:]
+    /// Bumped when the pictures may have changed on disk, so blocks showing one redraw.
+    private var imageVersion = 0
 
     func start() {
         let fm = FileManager.default
@@ -51,9 +54,10 @@ final class ThemeStore {
 
     /// A background picture from the themes folder.
     func image(_ file: String) -> NSImage? {
+        _ = imageVersion
         if let cached = images[file] { return cached }
         let loaded = NSImage(contentsOf: Self.directory.appendingPathComponent(file))
-        images[file] = loaded
+        images.updateValue(loaded, forKey: file)
         return loaded
     }
 
@@ -83,18 +87,23 @@ final class ThemeStore {
         let entries = files.filter { $0.pathExtension == "json" }
             .map { url -> Entry in
                 let id = url.deletingPathExtension().lastPathComponent
-                return Entry(id: id, title: Self.loadFile(url)?.theme.name ?? id)
+                return Entry(id: id, title: (try? Data(contentsOf: url)).flatMap(ResolvedTheme.title) ?? id)
             }
             .sorted { $0.id.localizedStandardCompare($1.id) == .orderedAscending }
         var name = (try? String(contentsOf: Self.activeFile, encoding: .utf8))?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if name?.hasSuffix(".json") == true { name = name.map { String($0.dropLast(5)) } }
-        if name == "" || name?.lowercased() == "default" { name = nil }
+        if name == "" { name = nil }
+        // The file system ignores case; show the name the way the file spells it.
+        if let match = entries.first(where: { $0.id.caseInsensitiveCompare(name ?? "") == .orderedSame }) { name = match.id }
 
         var next = ResolvedTheme.standard
         var problems: [String] = []
         if let name {
-            if let loaded = Self.loadFile(Self.directory.appendingPathComponent(name + ".json")) {
+            // A name, never a path out of the themes folder.
+            if name.contains("/") || name.hasPrefix(".") {
+                problems = ["active.txt must hold a theme's file name, not a path."]
+            } else if let loaded = Self.loadFile(Self.directory.appendingPathComponent(name + ".json")) {
                 (next, problems) = loaded
             } else {
                 problems = ["Theme \"\(name)\" isn't in the themes folder."]
@@ -104,9 +113,11 @@ final class ThemeStore {
         if selected != name { selected = name }
         if issues != problems { issues = problems }
         // A picture can change under the same name.
-        let hadImages = !images.isEmpty
-        images = [:]
-        guard next != theme || hadImages else { return }
+        if !images.isEmpty {
+            images = [:]
+            imageVersion += 1
+        }
+        guard next != theme else { return }
         withAnimation(.easeOut(duration: 0.2)) { theme = next }
         onChange?()
     }

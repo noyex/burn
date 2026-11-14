@@ -141,7 +141,7 @@ private struct ShelfTile: View {
         .allowsHitTesting(false)
         .floating(Theme(scheme).neutral, in: shape)
         .overlay {
-            shape.strokeBorder(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(Theme.photoEdge),
+            shape.strokeBorder(selected ? Theme(scheme).selection : Theme.photoEdge,
                                lineWidth: selected ? 2.5 : 0.5)
         }
         .overlay(alignment: .topTrailing) {
@@ -166,7 +166,7 @@ private struct ShelfTile: View {
 
     private var checkmark: some View {
         ZStack {
-            Circle().fill(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(Theme.photoScrim))
+            Circle().fill(selected ? Theme(scheme).selection : Theme.photoScrim)
             Circle().strokeBorder(Theme.onPhoto.opacity(selected ? 0 : 0.9), lineWidth: 1.5)
             if selected {
                 Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.onPhoto)
