@@ -34,6 +34,7 @@ final class ThemeStore {
     /// The menu bar is drawn outside SwiftUI and has to be told.
     @ObservationIgnored var onChange: (() -> Void)?
     @ObservationIgnored private var stream: FSEventStreamRef?
+    @ObservationIgnored private var images: [String: NSImage] = [:]
 
     func start() {
         let fm = FileManager.default
@@ -48,6 +49,14 @@ final class ThemeStore {
         reload()
     }
 
+    /// A background picture from the themes folder.
+    func image(_ file: String) -> NSImage? {
+        if let cached = images[file] { return cached }
+        let loaded = NSImage(contentsOf: Self.directory.appendingPathComponent(file))
+        images[file] = loaded
+        return loaded
+    }
+
     func openFolder() {
         NSWorkspace.shared.open(Self.directory)
     }
@@ -60,7 +69,9 @@ final class ThemeStore {
 
     static func loadFile(_ url: URL) -> (theme: ResolvedTheme, issues: [String])? {
         guard let data = try? Data(contentsOf: url) else { return nil }
-        return ResolvedTheme.parse(data, name: url.deletingPathExtension().lastPathComponent, fontExists: fontExists)
+        return ResolvedTheme.parse(data, name: url.deletingPathExtension().lastPathComponent, fontExists: fontExists) {
+            FileManager.default.fileExists(atPath: url.deletingLastPathComponent().appendingPathComponent($0).path)
+        }
     }
 
     private static func fontExists(_ name: String) -> Bool {
@@ -92,7 +103,10 @@ final class ThemeStore {
         if available != entries { available = entries }
         if selected != name { selected = name }
         if issues != problems { issues = problems }
-        guard next != theme else { return }
+        // A picture can change under the same name.
+        let hadImages = !images.isEmpty
+        images = [:]
+        guard next != theme || hadImages else { return }
         withAnimation(.easeOut(duration: 0.2)) { theme = next }
         onChange?()
     }

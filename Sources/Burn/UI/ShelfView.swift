@@ -31,7 +31,7 @@ struct ShelfView: View {
             .foregroundStyle(Theme(scheme).accentInk)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 36)
-            .floating(Theme(scheme).accent, in: Bento.blockShape)
+            .floating(.accent, in: Bento.blockShape)
         } else {
             let rows = (shelf.items.count + columns - 1) / columns
             let contentHeight = CGFloat(rows) * (tileHeight + spacing) - spacing
@@ -130,7 +130,7 @@ private struct ShelfTile: View {
                     .font(.system(size: 11, weight: .semibold))
                     .padding(.horizontal, 10)
                     .frame(height: 24)
-                    .glass(in: Capsule())
+                    .glass(in: Bento.pill)
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }

@@ -26,20 +26,26 @@ So the look is a public contract, and every new feature has to keep it:
    falls back to `ThemeToken.standard`. New tokens must look right with no theme file at all, and
    in both light and dark.
 5. **Shape and type come from the theme too.** Block corners use `Bento.blockShape` /
-   `Bento.smallShape`, spacing between blocks uses `Bento.gap`, text uses `Font.brand(size, weight)`.
-   No hardcoded `cornerRadius` on blocks, no `.custom("…")` fonts, no `.system(size:)` for text
-   (it is for SF Symbols and monospaced code only).
-6. **The only exceptions** are the marks drawn over screenshots (`Theme.photoEdge` and friends):
+   `Bento.smallShape`, buttons and pills use `Bento.pill` (never `Capsule()`), spacing between
+   blocks uses `Bento.gap`, text uses `Font.brand(size, weight)`. No hardcoded `cornerRadius` on
+   blocks, no `.custom("…")` fonts, no `.system(size:)` for text (it is for SF Symbols and
+   monospaced code only).
+6. **A new block takes a token, not a color.** Fill it with `.block(.accent)` /
+   `.floating(.neutral, in:)` so it picks up the gradient, image or pattern a theme gives that
+   token. A new kind of block that should be styled on its own gets its own token and an entry
+   in `BlockBackground.slots`.
+7. **The only exceptions** are the marks drawn over screenshots (`Theme.photoEdge` and friends):
    they must read on any image, so they are fixed. They still live in `Theme.swift`.
-7. **Nothing the user customizes goes in the app bundle or gets overwritten.** User files live in
+8. **Nothing the user customizes goes in the app bundle or gets overwritten.** User files live in
    `~/Library/Application Support/Burn/`. Burn may create files there, but only ever rewrites its
    own (`themes/README.md`). Never migrate, reformat or "fix" a user's theme file.
-8. **Changed the theme format or a token? Update `docs/themes.md` in the same PR.** It ships
+9. **Changed the theme format or a token? Update `docs/themes.md` in the same PR.** It ships
    inside the app and is copied to the user's themes folder as `README.md`: it is what their
    agent reads before writing a theme.
 
 Before you finish a UI change, run it with a loud theme (set `accent`, `neutral`, `text`,
-`surface` to obviously wrong colors, `shape.radius` to 0) in light and dark. Anything that didn't
+`surface` to obviously wrong colors, `shape.radius` and `shape.pill` to 0, a `dots` pattern on
+every block) in light and dark. Anything that didn't
 change is hardcoded.
 
 ## Checks

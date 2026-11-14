@@ -57,7 +57,7 @@ struct PopoverView: View {
                         model.editingPanel = true
                     }
                 }
-                .block(theme.surface)
+                .block(.surface)
                 .transition(tabTransition)
             } else {
                 main.transition(tabTransition)
@@ -201,7 +201,7 @@ struct PopoverView: View {
             .tint(theme.accentInk)
             .controlSize(.small)
             .foregroundStyle(theme.accentInk)
-            .block(theme.accent)
+            .block(.accent)
         }
     }
 
@@ -321,8 +321,8 @@ struct PopoverView: View {
             }
             .padding(.horizontal, 11)
             .frame(height: 28)
-            .floating(theme.surface, in: Capsule())
-            .contentShape(Capsule())
+            .floating(theme.surface, in: Bento.pill)
+            .contentShape(Bento.pill)
         }
         .buttonStyle(PressStyle())
         .accessibilityLabel("Show \(title)")
@@ -336,7 +336,7 @@ struct PopoverView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .block(theme.neutral)
+        .block(.neutral)
     }
 
     private var signIn: some View {
@@ -351,7 +351,7 @@ struct PopoverView: View {
                 }
             }
         }
-        .block(theme.neutral)
+        .block(.neutral)
     }
 
     // MARK: Footer
@@ -392,7 +392,7 @@ struct PopoverView: View {
         }
         .font(.brand(11))
         .padding(4)
-        .floating(theme.surface, in: Capsule())
+        .floating(theme.surface, in: Bento.pill)
         .animation(.easeOut(duration: 0.2), value: updateShown)
     }
 
@@ -444,8 +444,8 @@ struct PopoverView: View {
             .foregroundStyle(copiedShare ? theme.text : theme.secondary)
             .padding(.horizontal, copiedShare ? 10 : 0)
             .frame(minWidth: 28, minHeight: 28)
-            .background(hoveringShare ? theme.neutralHover : theme.neutral, in: Capsule())
-            .contentShape(Capsule())
+            .background(hoveringShare ? theme.neutralHover : theme.neutral, in: Bento.pill)
+            .contentShape(Bento.pill)
         }
         .buttonStyle(PressStyle())
         .onHover { h in withAnimation(.easeOut(duration: 0.15)) { hoveringShare = h } }

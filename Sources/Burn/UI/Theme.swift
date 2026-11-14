@@ -17,7 +17,17 @@ struct Theme {
         ThemeStore.shared.theme.color(token, dark: dark) ?? RGBA(hex: 0x808080)
     }
 
-    private func color(_ token: ThemeToken) -> Color { Color(rgba(token)) }
+    func color(_ token: ThemeToken) -> Color { Color(rgba(token)) }
+
+    func paint(_ paint: BlockBackground.Paint) -> Color {
+        switch paint {
+        case let .color(rgba): Color(rgba)
+        case let .token(token): color(token)
+        }
+    }
+
+    /// What the theme draws on blocks filled with `slot`, if anything.
+    func background(_ slot: ThemeToken) -> BlockBackground? { ThemeStore.shared.theme.backgrounds[slot] }
 
     var base: Color { color(.base) }
     var neutral: Color { color(.neutral) }
@@ -79,6 +89,8 @@ struct Theme {
     static let photoScrim = Color.black.opacity(0.25)
     static let photoShadow = Color.black.opacity(0.3)
     static let onPhoto = Color.white
+    /// Opaque side of a fade mask; only its alpha matters.
+    static let mask = Color.black
     /// Nearly invisible fill that still catches clicks.
     static let hitArea = Color.black.opacity(0.001)
 }

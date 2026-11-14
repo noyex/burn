@@ -25,7 +25,7 @@ struct CommandChip: View {
             }
             .padding(.horizontal, 7)
             .frame(height: 22)
-            .glass(in: Capsule(), interactive: true)
+            .glass(in: Bento.pill, interactive: true)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

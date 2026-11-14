@@ -3,8 +3,9 @@ import Testing
 @testable import Burn
 
 struct ThemeSpecTests {
-    private func parse(_ json: String, fontExists: (String) -> Bool = { _ in true }) -> (theme: ResolvedTheme, issues: [String]) {
-        ResolvedTheme.parse(Data(json.utf8), name: "file", fontExists: fontExists)
+    private func parse(_ json: String, fontExists: (String) -> Bool = { _ in true },
+                       imageExists: (String) -> Bool = { _ in true }) -> (theme: ResolvedTheme, issues: [String]) {
+        ResolvedTheme.parse(Data(json.utf8), name: "file", fontExists: fontExists, imageExists: imageExists)
     }
 
     @Test func parsesHexColors() {
@@ -51,14 +52,43 @@ struct ThemeSpecTests {
     @Test func reportsWhatItSkips() {
         let (theme, issues) = parse(##"""
         {"extra": 1, "colors": {"nope": "#000000", "base": "red"},
-         "shape": {"radius": 99, "gap": "wide"}, "fonts": {"text": "Missing Sans", "display": "Real"}}
+         "shape": {"radius": 99, "gap": "wide", "pill": true}, "fonts": {"text": "Missing Sans", "display": "Real"}}
         """##) { $0 == "Real" }
-        #expect(issues.count == 6)
+        #expect(issues.count == 7)
         #expect(theme.color(.base, dark: false) == ThemeToken.base.standard(dark: false))
         #expect(theme.radius == 24)
         #expect(theme.gap == 6)
         #expect(theme.textFont == nil)
         #expect(theme.displayFont == "Real")
+    }
+
+    @Test func parsesBlockBackgrounds() {
+        let (theme, issues) = parse(##"""
+        {"shape": {"radius": 0, "pill": 0},
+         "backgrounds": {
+           "accent": {"gradient": {"colors": ["#7C5CFF", "coral"], "angle": 135},
+                      "pattern": {"type": "dots", "spacing": 4, "fade": "bottom"}},
+           "surface": {"image": {"file": "bg.png", "opacity": 0.5}}}}
+        """##)
+        #expect(issues.isEmpty)
+        #expect(theme.pill == 0)
+        let accent = theme.backgrounds[.accent]
+        #expect(accent?.gradient == .init(colors: [.color(RGBA(hex: 0x7C5CFF)), .token(.coral)], angle: 135))
+        // A pattern without a color takes the block's ink.
+        #expect(accent?.pattern == .init(kind: .dots, color: .token(.accentInk), spacing: 4, fade: .bottom))
+        #expect(theme.backgrounds[.surface]?.image == .init(file: "bg.png", opacity: 0.5))
+    }
+
+    @Test func skipsBackgroundsItCannotDraw() {
+        let (theme, issues) = parse(##"""
+        {"backgrounds": {
+           "text": {"pattern": {"type": "dots"}},
+           "accent": {"gradient": {"colors": ["#7C5CFF"]}, "pattern": {"type": "zigzag"},
+                      "image": {"file": "../secret.png"}},
+           "coral": {"image": {"file": "missing.png"}}}}
+        """##, imageExists: { _ in false })
+        #expect(issues.count == 5)
+        #expect(theme.backgrounds.isEmpty)
     }
 
     @Test func brokenJSONFallsBackToTheBuiltInLook() {
