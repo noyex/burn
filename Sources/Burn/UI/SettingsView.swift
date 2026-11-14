@@ -9,7 +9,8 @@ struct SettingsView: View {
     @State private var draggedRow: ProviderID?
     @State private var dragStart = 0
     @State private var dragTranslation: CGFloat = 0
-    @State private var promptCopied = false
+    /// The prompt just copied, to confirm it on its row.
+    @State private var copiedPrompt: String?
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -180,7 +181,12 @@ struct SettingsView: View {
             Picker("Theme", selection: Binding(get: { store.selected ?? "" },
                                                set: { store.select($0.isEmpty ? nil : $0) })) {
                 Text("Default").tag("")
-                ForEach(store.available) { Text($0.title).tag($0.id) }
+                ForEach(store.available.filter(\.builtIn)) { Text($0.title).tag($0.id) }
+                let own = store.available.filter { !$0.builtIn }
+                if !own.isEmpty {
+                    Divider()
+                    ForEach(own) { Text($0.title).tag($0.id) }
+                }
                 // Named in active.txt but missing: keep it visible instead of an empty picker.
                 if let selected = store.selected, !store.available.contains(where: { $0.id == selected }) {
                     Text(selected).tag(selected)
@@ -193,27 +199,11 @@ struct SettingsView: View {
         }
         .frame(height: 32)
         Divider().opacity(0.6)
-        Button {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(ThemeStore.agentPrompt, forType: .string)
-            promptCopied = true
-            Task {
-                try? await Task.sleep(for: .seconds(1.5))
-                promptCopied = false
-            }
-        } label: {
-            HStack {
-                Text("Copy prompt for your agent")
-                Spacer()
-                Image(systemName: promptCopied ? "checkmark" : "doc.on.doc")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(theme.secondary)
-            }
-            .frame(height: 32)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .hoverTip("Paste it to Claude Code, Codex or Cursor and say what you want")
+        promptRow("Copy prompt for your agent", prompt: ThemeStore.agentPrompt,
+                  tip: "Paste it to Claude Code, Codex or Cursor and say what you want")
+        Divider().opacity(0.6)
+        promptRow("No idea? Ask your agent for ideas", prompt: ThemeStore.ideasPrompt,
+                  tip: "Copies a prompt: your agent designs four themes to pick from")
         Divider().opacity(0.6)
         Button { store.openFolder() } label: {
             HStack {
@@ -225,6 +215,30 @@ struct SettingsView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func promptRow(_ title: String, prompt: String, tip: String) -> some View {
+        Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(prompt, forType: .string)
+            copiedPrompt = prompt
+            Task {
+                try? await Task.sleep(for: .seconds(1.5))
+                if copiedPrompt == prompt { copiedPrompt = nil }
+            }
+        } label: {
+            HStack {
+                Text(title)
+                Spacer()
+                Image(systemName: copiedPrompt == prompt ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(theme.secondary)
+            }
+            .frame(height: 32)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .hoverTip(tip)
     }
 
     private func providerListRow(_ p: ProviderID) -> some View {

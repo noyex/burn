@@ -39,7 +39,10 @@ So the look is a public contract, and every new feature has to keep it:
 8. **Nothing the user customizes goes in the app bundle or gets overwritten.** User files live in
    `~/Library/Application Support/Burn/`. Burn may create files there, but only ever rewrites its
    own (`themes/README.md`). Never migrate, reformat or "fix" a user's theme file.
-9. **Changed the theme format or a token? Update `docs/themes.md` in the same PR.** It ships
+9. **Built-in themes are ordinary theme files** in `assets/Themes/`, bundled with the app and
+   listed in Settings. They use only what `docs/themes.md` documents, so users can copy them.
+   A test parses each one.
+10. **Changed the theme format or a token? Update `docs/themes.md` in the same PR.** It ships
    inside the app and is copied to the user's themes folder as `README.md`: it is what their
    agent reads before writing a theme.
 

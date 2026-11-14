@@ -115,6 +115,18 @@ struct ThemeSpecTests {
         #expect(theme.displayFont == "Avenir Next")
     }
 
+    @Test func builtInThemesHaveNoProblems() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let files = try FileManager.default.contentsOfDirectory(at: root.appendingPathComponent("assets/Themes"), includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "json" }
+        #expect(!files.isEmpty)
+        for file in files {
+            let (theme, issues) = ResolvedTheme.parse(try Data(contentsOf: file), name: "")
+            #expect(issues.isEmpty, "\(file.lastPathComponent): \(issues)")
+            #expect(!theme.name.isEmpty, "\(file.lastPathComponent) needs a name")
+        }
+    }
+
     /// The guide in the user's themes folder is how agents learn the format: a token missing
     /// from it can't be themed in practice.
     @Test func guideDocumentsEveryToken() throws {

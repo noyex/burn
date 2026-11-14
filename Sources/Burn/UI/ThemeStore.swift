@@ -23,6 +23,20 @@ final class ThemeStore {
         let id: String
         /// The theme's own `name`, or the file name.
         let title: String
+        /// Ships inside the app rather than living in the user's folder.
+        var builtIn = false
+    }
+
+    /// Ready-made themes inside the app. A file of the same name in the user's folder wins.
+    nonisolated static let builtInDirectory = Bundle.main.resourceURL?.appendingPathComponent("Themes", isDirectory: true)
+
+    /// The file a theme name stands for: the user's own, else the built-in one.
+    nonisolated static func file(for name: String) -> URL {
+        let own = directory.appendingPathComponent(name + ".json")
+        if !FileManager.default.fileExists(atPath: own.path),
+           let builtIn = builtInDirectory?.appendingPathComponent(name + ".json"),
+           FileManager.default.fileExists(atPath: builtIn.path) { return builtIn }
+        return own
     }
 
     private(set) var available: [Entry] = []
@@ -71,6 +85,15 @@ final class ThemeStore {
             + "format, how to turn the theme on and how to check it. What I want: "
     }
 
+    /// For a user with no idea yet: the agent comes up with a few designs to pick from.
+    static var ideasPrompt: String {
+        "Design 4 themes for Burn, my menu bar app, each in a clearly different style. First read "
+            + "\"\(guideFile.path)\": it explains the format and how to check a theme. Write each one as its own "
+            + "file in the themes folder, use colors, block backgrounds, shape and fonts, and check every file. "
+            + "Then describe each theme in one line and turn on the one you like best. I'll try the rest in "
+            + "Burn → Settings → Theme."
+    }
+
     static func loadFile(_ url: URL) -> (theme: ResolvedTheme, issues: [String])? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return ResolvedTheme.parse(data, name: url.deletingPathExtension().lastPathComponent, fontExists: fontExists) {
@@ -84,12 +107,19 @@ final class ThemeStore {
 
     private func reload() {
         let files = (try? FileManager.default.contentsOfDirectory(at: Self.directory, includingPropertiesForKeys: nil)) ?? []
-        let entries = files.filter { $0.pathExtension == "json" }
-            .map { url -> Entry in
-                let id = url.deletingPathExtension().lastPathComponent
-                return Entry(id: id, title: (try? Data(contentsOf: url)).flatMap(ResolvedTheme.title) ?? id)
-            }
-            .sorted { $0.id.localizedStandardCompare($1.id) == .orderedAscending }
+        func list(_ urls: [URL], builtIn: Bool) -> [Entry] {
+            urls.filter { $0.pathExtension == "json" }
+                .map { url -> Entry in
+                    let id = url.deletingPathExtension().lastPathComponent
+                    return Entry(id: id, title: (try? Data(contentsOf: url)).flatMap(ResolvedTheme.title) ?? id, builtIn: builtIn)
+                }
+                .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        }
+        let own = list(files, builtIn: false)
+        let shipped = Self.builtInDirectory.flatMap { try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil) } ?? []
+        let entries = list(shipped, builtIn: true).filter { theme in
+            !own.contains { $0.id.caseInsensitiveCompare(theme.id) == .orderedSame }
+        } + own
         var name = (try? String(contentsOf: Self.activeFile, encoding: .utf8))?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if name?.hasSuffix(".json") == true { name = name.map { String($0.dropLast(5)) } }
@@ -103,7 +133,7 @@ final class ThemeStore {
             // A name, never a path out of the themes folder.
             if name.contains("/") || name.hasPrefix(".") {
                 problems = ["active.txt must hold a theme's file name, not a path."]
-            } else if let loaded = Self.loadFile(Self.directory.appendingPathComponent(name + ".json")) {
+            } else if let loaded = Self.loadFile(Self.file(for: name)) {
                 (next, problems) = loaded
             } else {
                 problems = ["Theme \"\(name)\" isn't in the themes folder."]
@@ -155,7 +185,7 @@ func runCheckTheme(_ argument: String?) -> Int32 {
     }
     let url = argument.contains("/") || argument.hasSuffix(".json")
         ? URL(fileURLWithPath: argument)
-        : ThemeStore.directory.appendingPathComponent(argument + ".json")
+        : ThemeStore.file(for: argument)
     guard let (theme, issues) = ThemeStore.loadFile(url) else {
         print("Can't read \(url.path)")
         return 2

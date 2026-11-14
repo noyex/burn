@@ -27,6 +27,7 @@ xcrun actool assets/AppIcon.icon --compile "$APP/Contents/Resources" --platform 
   --minimum-deployment-target 14.0 --app-icon AppIcon \
   --output-partial-info-plist "$(mktemp)" --output-format human-readable-text --errors --warnings
 cp -R assets/Fonts "$APP/Contents/Resources/Fonts"
+cp -R assets/Themes "$APP/Contents/Resources/Themes"
 # The theme guide Burn puts in the user's themes folder.
 cp docs/themes.md "$APP/Contents/Resources/themes.md"
 
