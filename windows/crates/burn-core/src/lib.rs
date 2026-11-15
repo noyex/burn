@@ -12,6 +12,7 @@ pub mod settings;
 pub mod share;
 pub mod shelf;
 pub mod store;
+pub mod theme;
 pub mod tier;
 mod util;
 
