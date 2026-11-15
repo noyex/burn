@@ -39,7 +39,7 @@
     transition: background 150ms ease-out;
   }
   /* The open list is drawn natively: give it the theme's colours, or dark mode puts light text
-     on the default white popup. */
+     on the system's light popup. */
   option {
     background: var(--raised);
     color: var(--text);
