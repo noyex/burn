@@ -83,7 +83,9 @@ final class AppModel {
             Task { await sync() }
         }
         // A release shows up the next time the user looks, not hours later.
-        if checkingUpdates, (updater.checkedAt.map { Date.now.timeIntervalSince($0) > 3600 }) ?? true {
+        if checkingUpdates,
+           (updater.checkedAt.map { Date.now.timeIntervalSince($0) > 3600 }) ?? true,
+           (updater.attemptedAt.map { Date.now.timeIntervalSince($0) > 300 }) ?? true {
             Task { await updater.check() }
         }
     }
