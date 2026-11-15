@@ -2,6 +2,7 @@
 <script lang="ts">
   import { LOGIN_COMMAND, PROVIDER_NAME, type LimitState, type ProviderId } from "../types";
   import { tip } from "../tip.svelte";
+  import BlockArt from "./BlockArt.svelte";
   import CommandChip from "./CommandChip.svelte";
   import Glyph from "./Glyph.svelte";
 
@@ -9,6 +10,7 @@
 </script>
 
 <div class="block row">
+  <BlockArt fill="neutral" />
   <Glyph {provider} size={12} />
   <span class="name">{PROVIDER_NAME[provider]}</span>
   <span class="spacer"></span>

@@ -1,6 +1,6 @@
 <!-- Small filled glyphs standing in for the SF Symbols the Mac app uses. -->
 <script lang="ts">
-  let { name, size = 10 }: { name: "alert-circle" | "alert-triangle" | "gear" | "share" | "check" | "plus" | "close" | "chevron-left" | "chevron-right" | "usage" | "shelf" | "expand" | "collapse"; size?: number } = $props();
+  let { name, size = 10 }: { name: "alert-circle" | "alert-triangle" | "gear" | "share" | "check" | "plus" | "close" | "chevron-left" | "chevron-right" | "copy" | "usage" | "shelf" | "expand" | "collapse"; size?: number } = $props();
 </script>
 
 <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">
@@ -31,6 +31,9 @@
     <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m10 3-5 5 5 5" />
   {:else if name === "chevron-right"}
     <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m6 3 5 5-5 5" />
+  {:else if name === "copy"}
+    <rect x="5" y="5" width="9" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
+    <path d="M3.5 11H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v.5" fill="none" stroke="currentColor" stroke-width="1.6" />
   {:else if name === "usage"}
     <path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M3.5 13V8.5M8 13V3M12.5 13V6" />
   {:else if name === "shelf"}

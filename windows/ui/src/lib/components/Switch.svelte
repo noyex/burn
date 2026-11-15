@@ -32,11 +32,10 @@
       transform 180ms var(--ease-out),
       background 150ms ease-out;
   }
-  @media (prefers-color-scheme: dark) {
-    /* The raised fill would vanish into the dark track. */
-    .knob {
-      background: var(--secondary);
-    }
+  /* On dark blocks the raised fill would vanish into the track. Set by theme.svelte.ts from the
+     actual fill, as a theme can be dark in the light appearance. */
+  :global(:root[data-blocks="dark"]) .switch:not(.on) .knob {
+    background: var(--secondary);
   }
   .on .knob {
     transform: translateX(12px);

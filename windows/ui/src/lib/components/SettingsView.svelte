@@ -1,4 +1,4 @@
-<!-- Settings (SettingsView.swift, ProviderSettingsView.swift): the panel's options, then one page per provider. -->
+<!-- Settings (SettingsView.swift, ProviderSettingsView.swift): the panel's options, one page per provider, and the theme page. -->
 <script lang="ts">
   import { cardProviders, customSizeOf, orderedProviders, sizes } from "../layout";
   import {
@@ -39,12 +39,15 @@
   import Segmented from "./Segmented.svelte";
   import Select from "./Select.svelte";
   import Switch from "./Switch.svelte";
+  import ThemeView from "./ThemeView.svelte";
   import ToggleRow from "./ToggleRow.svelte";
 
   let {
     snap,
     provider = $bindable(null),
+    pickingTheme = $bindable(false),
     commit,
+    onTheme,
     onLaunch,
     onBack,
     onArrange,
@@ -53,7 +56,11 @@
     snap: Snapshot;
     /** The provider page that is open, if any. */
     provider: ProviderId | null;
+    /** The theme page is open. */
+    pickingTheme: boolean;
     commit: (next: Settings) => void;
+    /** A theme was picked; null is the built-in look. */
+    onTheme: (id: string | null) => void;
     onLaunch: (on: boolean) => void;
     onBack: () => void;
     onArrange: () => void;
@@ -114,7 +121,9 @@
 {/snippet}
 
 <div class="settings">
-  {#if provider}
+  {#if pickingTheme}
+    <ThemeView theme={snap.theme} onPick={onTheme} onBack={() => (pickingTheme = false)} />
+  {:else if provider}
     {@const p = provider}
     {@const main = windowOptions(p, cardWindowId(s, p))}
     {@render header(PROVIDER_NAME[p], () => (provider = null), p)}
@@ -226,6 +235,16 @@
           </button>
         </div>
       {/each}
+    </div>
+
+    <div class="group">
+      <div class="item">
+        <button class="row link" onclick={() => (pickingTheme = true)}>
+          <span class="label">Theme</span>
+          <span class="secondary">{snap.theme.title}</span>
+          <span class="secondary"><Icons name="chevron-right" size={10} /></span>
+        </button>
+      </div>
     </div>
 
     {@render title("Shelf")}

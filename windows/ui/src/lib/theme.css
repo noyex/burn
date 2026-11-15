@@ -60,6 +60,8 @@
   --photo-scrim: rgba(0, 0, 0, 0.25);
   --photo-shadow: rgba(0, 0, 0, 0.3);
   --on-photo: #ffffff;
+  /* Opaque side of a fade mask; only its alpha matters. */
+  --mask: #000000;
 
   --radius: 14px;
   --radius-small: min(var(--radius), 8px);
@@ -68,8 +70,10 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --snappy: 250ms cubic-bezier(0.25, 1, 0.5, 1);
 
-  --font: "Bricolage", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Bricolage Display", "Bricolage", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  /* A theme's fonts come first (`--theme-font`, set by theme.svelte.ts); the big numbers follow
+     the text font when a theme names only that one. */
+  --font: var(--theme-font, "Bricolage"), "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: var(--theme-font-display, "Bricolage Display", "Bricolage"), "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
 
   color-scheme: light dark;
 }
@@ -133,6 +137,8 @@ button:focus-visible {
 /* A solid bento block floating over the desktop. */
 .block {
   position: relative;
+  /* Keeps the theme's background art (BlockArt.svelte) between the fill and the content. */
+  isolation: isolate;
   border-radius: var(--radius);
   padding: 12px;
   box-shadow:

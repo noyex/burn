@@ -1,6 +1,7 @@
 <!-- Grid of copied screenshots (ShelfView.swift). Scrolls inside its maximum height. -->
 <script lang="ts">
   import type { ShelfItem } from "../types";
+  import BlockArt from "./BlockArt.svelte";
   import ShelfTile from "./ShelfTile.svelte";
 
   let {
@@ -30,6 +31,7 @@
 
 {#if items.length === 0}
   <div class="block empty">
+    <BlockArt fill="accent" />
     <p class="title">Screenshots you copy show up here</p>
     <p class="how">Win+Shift+S or copy any image</p>
   </div>

@@ -1,5 +1,6 @@
 // Talks to the Rust side. In a plain browser (`npm run dev` without Tauri) it serves demo data
-// instead, so the UI can be built and screenshotted anywhere: `?demo=loading|signedOut|empty|emptyShelf`.
+// instead, so the UI can be built and screenshotted anywhere: `?demo=loading|signedOut|empty|emptyShelf`,
+// `?theme=terminal` for a built-in theme.
 
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { Period, Settings, Snapshot } from "./types";
@@ -10,7 +11,10 @@ const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 type Listener = (s: Snapshot) => void;
 
 export async function getState(): Promise<Snapshot> {
-  if (!inTauri) return demoSnapshot(new URLSearchParams(location.search).get("demo"));
+  if (!inTauri) {
+    const params = new URLSearchParams(location.search);
+    return demoSnapshot(params.get("demo"), undefined, params.get("theme"));
+  }
   return invoke<Snapshot>("get_state");
 }
 
@@ -48,6 +52,9 @@ export const hidePanel = () => call("hide_panel");
 export const contentResized = (width: number, height: number) => call("content_resized", { width, height });
 export const setSettings = (settings: Settings) => call("set_settings", { settings });
 export const setLaunchAtLogin = (on: boolean) => call("set_launch_at_login", { on });
+/** Turns a theme on by its file name; null is the built-in look. */
+export const setTheme = (name: string | null) => call("set_theme", { name });
+export const openThemesFolder = () => call("open_themes_folder");
 export const quit = () => call("quit");
 export const installUpdate = () => call("install_update");
 export const isTauri = inTauri;
