@@ -1,0 +1,21 @@
+{
+  "name": "Aurora",
+  "colors": {
+    "base": "#07090F", "surface": "#0B0F17", "neutral": "#0F141E", "neutral-hover": "#161D2A", "raised": "#222B3B",
+    "text": "#EEF3FA", "secondary": "#7C8798", "switcher": "#0B0F17", "switcher-ink": "#EEF3FA",
+    "hairline": "#FFFFFF17", "shadow": "#00000099",
+    "accent": "#0B0F17", "accent-ink": "#EEF3FA",
+    "coral": "#0B0F17", "coral-ink": "#EEF3FA", "mono": "#0B0F17", "mono-ink": "#EEF3FA",
+    "lavender": "#0B0F17", "lavender-ink": "#EEF3FA", "sky": "#0B0F17", "sky-ink": "#EEF3FA",
+    "selection": "#2DD4BF"
+  },
+  "shape": { "radius": 16, "gap": 8 },
+  "backgrounds": {
+    "accent": { "gradient": { "colors": ["#14B8A600", "#14B8A61F", "#8B5CF655"] }, "pattern": { "type": "dots", "color": "#5EEAD4", "opacity": 0.45, "spacing": 5, "size": 1, "fade": "top" } },
+    "coral": { "gradient": { "colors": ["#8B5CF600", "#8B5CF63D"] }, "pattern": { "type": "dots", "color": "#A78BFA", "opacity": 0.4, "spacing": 5, "size": 1, "fade": "top" } },
+    "mono": { "gradient": { "colors": ["#14B8A600", "#14B8A63D"] }, "pattern": { "type": "dots", "color": "#5EEAD4", "opacity": 0.4, "spacing": 5, "size": 1, "fade": "top" } },
+    "lavender": { "gradient": { "colors": ["#38BDF800", "#38BDF83D"] }, "pattern": { "type": "dots", "color": "#7DD3FC", "opacity": 0.4, "spacing": 5, "size": 1, "fade": "top" } },
+    "sky": { "gradient": { "colors": ["#22C55E00", "#22C55E3D"] }, "pattern": { "type": "dots", "color": "#86EFAC", "opacity": 0.4, "spacing": 5, "size": 1, "fade": "top" } },
+    "surface": { "gradient": { "colors": ["#14B8A600", "#8B5CF61A"] } }
+  }
+}

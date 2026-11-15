@@ -1,0 +1,20 @@
+{
+  "name": "Frost",
+  "colors": {
+    "base": "#EEF2F7", "surface": "#F8FAFC", "neutral": "#FFFFFF", "neutral-hover": "#F1F5F9", "raised": "#FFFFFF",
+    "text": "#0F172A", "secondary": "#64748B", "switcher": "#0F172A", "switcher-ink": "#FFFFFF",
+    "hairline": "#0F172A14", "shadow": "#0F172A1F",
+    "accent": "#FFFFFF", "accent-ink": "#0F172A",
+    "coral": "#FFFFFF", "coral-ink": "#0F172A", "mono": "#FFFFFF", "mono-ink": "#0F172A",
+    "lavender": "#FFFFFF", "lavender-ink": "#0F172A", "sky": "#FFFFFF", "sky-ink": "#0F172A",
+    "selection": "#2563EB"
+  },
+  "shape": { "radius": 14, "gap": 8 },
+  "backgrounds": {
+    "accent": { "gradient": { "colors": ["#3B82F600", "#3B82F600", "#3B82F62E"] }, "pattern": { "type": "dots", "color": "#3B82F6", "opacity": 0.55, "spacing": 4, "size": 1.1, "fade": "top" } },
+    "coral": { "gradient": { "colors": ["#3B82F600", "#3B82F61F"] }, "pattern": { "type": "dots", "color": "#3B82F6", "opacity": 0.45, "spacing": 4, "size": 1.1, "fade": "top" } },
+    "mono": { "gradient": { "colors": ["#3B82F600", "#3B82F61F"] }, "pattern": { "type": "dots", "color": "#3B82F6", "opacity": 0.45, "spacing": 4, "size": 1.1, "fade": "top" } },
+    "lavender": { "gradient": { "colors": ["#3B82F600", "#3B82F61F"] }, "pattern": { "type": "dots", "color": "#3B82F6", "opacity": 0.45, "spacing": 4, "size": 1.1, "fade": "top" } },
+    "sky": { "gradient": { "colors": ["#3B82F600", "#3B82F61F"] }, "pattern": { "type": "dots", "color": "#3B82F6", "opacity": 0.45, "spacing": 4, "size": 1.1, "fade": "top" } }
+  }
+}
