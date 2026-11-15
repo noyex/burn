@@ -103,7 +103,8 @@ private struct ShelfTile: View {
     @Environment(\.colorScheme) private var scheme
 
     private static let checkbox: CGFloat = 26
-    private let shape = Bento.blockShape
+    // Computed, so a live theme change reaches the corners.
+    private var shape: RoundedRectangle { Bento.blockShape }
 
     init(item: ShelfItem, size: CGSize, selected: Bool, selecting: Bool, actions: Actions) {
         self.item = item
@@ -123,7 +124,7 @@ private struct ShelfTile: View {
                     .scaledToFill()
                     .frame(width: size.width, height: size.height)
             } else {
-                Rectangle().fill(Theme(scheme).neutral)
+                Rectangle().fill(Theme(scheme).text.opacity(0.1))
             }
             if copied {
                 Label("Copied", systemImage: "checkmark")
