@@ -66,6 +66,10 @@ pub fn set_entries(entries: &[WidgetEntry]) {
     win::set_entries(to_entries(entries));
 }
 
+pub fn set_alert_colors(colors: burn_taskbar::model::AlertColors) {
+    win::set_alert_colors(colors);
+}
+
 fn to_entries(entries: &[WidgetEntry]) -> Vec<Entry> {
     let now = chrono::Utc::now().timestamp_millis();
     entries

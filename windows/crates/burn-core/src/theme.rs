@@ -775,6 +775,19 @@ pub fn font_installed(name: &str) -> bool {
 const NOTE: &str = "<!-- Burn rewrites this file on every launch. Your themes are the .json files next to it. -->\n\n";
 const MAX_IMAGE_BYTES: u64 = 25_000_000;
 
+/// The folder of the themes that ship with the app: `built-in-themes` next to the executable
+/// (where the installer puts it), in debug builds also the repo's `assets/Themes`.
+pub fn built_in_dir() -> Option<PathBuf> {
+    let beside = std::env::current_exe().ok().and_then(|exe| Some(exe.parent()?.join("built-in-themes")));
+    if let Some(dir) = beside.filter(|dir| dir.is_dir()) {
+        return Some(dir);
+    }
+    if cfg!(debug_assertions) {
+        return Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/Themes").canonicalize().ok();
+    }
+    None
+}
+
 /// The themes folders: the user's own and the one that ships with the app.
 #[derive(Clone, Debug)]
 pub struct ThemeDirs {
@@ -1379,6 +1392,71 @@ mod tests {
 
     fn assets_dir() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..").canonicalize().unwrap()
+    }
+
+    /// The `--name: value;` pairs of the `{ ... }` block that follows the selectors in `path`, in order.
+    fn css_block(css: &str, path: &[&str]) -> BTreeMap<String, String> {
+        let mut from = 0;
+        for selector in path {
+            from += css[from..].find(selector).unwrap_or_else(|| panic!("theme.css has no `{selector}`"));
+        }
+        let open = from + css[from..].find('{').unwrap();
+        let close = open + css[open..].find('}').unwrap();
+        css[open + 1..close]
+            .split(';')
+            .filter_map(|decl| {
+                let (name, value) = decl.split_once(':')?;
+                let name = name.trim().strip_prefix("--")?;
+                Some((name.to_string(), value.trim().to_string()))
+            })
+            .collect()
+    }
+
+    /// `#rrggbb` or `rgba(r, g, b, a)` as bytes and alpha.
+    fn css_color(value: &str) -> Option<(u8, u8, u8, f64)> {
+        if let Some(color) = Rgba::parse(value) {
+            let byte = |c: f64| (c * 255.0).round() as u8;
+            return Some((byte(color.r), byte(color.g), byte(color.b), color.a));
+        }
+        let inner = value.strip_prefix("rgba(")?.strip_suffix(')')?;
+        let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+        let [r, g, b, a] = parts[..] else { return None };
+        Some((r.parse().ok()?, g.parse().ok()?, b.parse().ok()?, a.parse().ok()?))
+    }
+
+    /// The panel's CSS repeats the built-in colors; a token changed in Rust but not there would
+    /// paint the default look wrong.
+    #[test]
+    fn panel_css_matches_the_built_in_tokens() {
+        let css = fs::read_to_string(assets_dir().join("windows/ui/src/lib/theme.css")).unwrap();
+        let mut stripped = String::new();
+        let mut rest = css.as_str();
+        while let Some(i) = rest.find("/*") {
+            stripped.push_str(&rest[..i]);
+            rest = rest[i..].split_once("*/").map_or("", |(_, after)| after);
+        }
+        stripped.push_str(rest);
+
+        let light = css_block(&stripped, &[":root"]);
+        let mut dark = light.clone();
+        dark.extend(css_block(&stripped, &["@media (prefers-color-scheme: dark)", ":root"]));
+        let mut checked = 0;
+        for token in Token::ALL {
+            for (dark_mode, vars) in [(false, &light), (true, &dark)] {
+                let Some(expected) = token.standard(dark_mode) else { continue };
+                let appearance = if dark_mode { "dark" } else { "light" };
+                let found = vars
+                    .get(token.key())
+                    .unwrap_or_else(|| panic!("theme.css has no --{} ({appearance})", token.key()));
+                let (r, g, b, a) = css_color(found)
+                    .unwrap_or_else(|| panic!("theme.css --{} ({appearance}) is not a color: {found}", token.key()));
+                let (er, eg, eb, _) = css_color(&expected.hex()[..7]).unwrap();
+                assert_eq!((r, g, b), (er, eg, eb), "--{} ({appearance}) is {found}", token.key());
+                assert!((a - expected.a).abs() < 0.005, "--{} ({appearance}) alpha is {found}", token.key());
+                checked += 1;
+            }
+        }
+        assert!(checked > 40, "only {checked} colors checked");
     }
 
     #[test]

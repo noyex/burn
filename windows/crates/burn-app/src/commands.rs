@@ -2,6 +2,7 @@
 
 use crate::model::{Model, Snapshot};
 use crate::panel::Panel;
+use crate::themes::Themes;
 use burn_core::Period;
 use burn_core::settings::Settings;
 use std::path::PathBuf;
@@ -51,6 +52,30 @@ pub fn quit(app: AppHandle) {
     app.exit(0);
 }
 
+/// Turns a theme on, or the built-in look with `None`; the panel gets the new state in a snapshot.
+/// Async, so reading the folders never blocks the UI thread.
+#[tauri::command]
+pub async fn set_theme(themes: State<'_, Arc<Themes>>, name: Option<String>) -> Result<(), String> {
+    themes.select(name.as_deref())
+}
+
+/// Shows the user's themes folder in the file manager.
+#[tauri::command]
+pub fn open_themes_folder(themes: State<'_, Arc<Themes>>) {
+    let folder = themes.folder();
+    let _ = std::fs::create_dir_all(folder);
+    let opener = if cfg!(windows) {
+        "explorer.exe"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    if let Err(e) = std::process::Command::new(opener).arg(folder).spawn() {
+        crate::log!("opening {}: {e}", folder.display());
+    }
+}
+
 /// Puts shelf screenshots on the clipboard: one as image and file, several as files.
 /// Async, so reading and converting a 4K screenshot never blocks the UI thread.
 #[tauri::command]
@@ -80,12 +105,17 @@ pub async fn shelf_copy(app: AppHandle, model: State<'_, Arc<Model>>, paths: Vec
 
 /// Copies an image of `period`'s spend. False when there's nothing to share or it failed.
 #[tauri::command]
-pub async fn share_copy(app: AppHandle, model: State<'_, Arc<Model>>, period: Period) -> Result<bool, ()> {
+pub async fn share_copy(
+    app: AppHandle,
+    model: State<'_, Arc<Model>>,
+    themes: State<'_, Arc<Themes>>,
+    period: Period,
+) -> Result<bool, ()> {
     let Some(usage) = model.usage_for(period) else { return Ok(false) };
     if usage.cost <= 0.0 {
         return Ok(false);
     }
-    let png = match burn_core::share::render_png(&usage, 2.0) {
+    let png = match burn_core::share::render_png(&usage, &themes.theme(), themes.theme_dir().as_deref(), 2.0) {
         Ok(png) => png,
         Err(e) => {
             crate::log!("share card failed: {e:#}");

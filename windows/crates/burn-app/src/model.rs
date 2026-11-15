@@ -4,6 +4,7 @@
 use burn_core::database::UsageDatabase;
 use burn_core::settings::{Settings, pick_window};
 use burn_core::shelf::{Shelf, ShelfItem};
+use burn_core::theme::{Loaded, ResolvedTheme, ThemeDirs, ThemeState};
 use burn_core::{LimitsError, Paths, Period, ProviderId, ProviderLimits, UsageSummary, importer, limits};
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -70,6 +71,8 @@ pub struct Snapshot {
     pub update: Option<String>,
     /// The update is downloading and installing.
     pub updating: bool,
+    /// The active theme and the available ones, as the panel's CSS needs them.
+    pub theme: ThemeState,
 }
 
 /// One provider in the taskbar widget.
@@ -121,6 +124,7 @@ impl Model {
                     shelf: Vec::new(),
                     update: None,
                     updating: false,
+                    theme: built_in_theme(&paths),
                 },
                 limits_fetched_at: None,
                 synced_at: None,
@@ -292,6 +296,11 @@ impl Model {
         self.changed();
     }
 
+    pub fn set_theme(&self, theme: ThemeState) {
+        lock(&self.state).snap.theme = theme;
+        self.changed();
+    }
+
     pub fn set_updating(&self, on: bool) {
         lock(&self.state).snap.updating = on;
         self.changed();
@@ -459,6 +468,18 @@ impl Model {
         }
         self.changed();
     }
+}
+
+/// The built-in look, until the themes folder has been read.
+fn built_in_theme(paths: &Paths) -> ThemeState {
+    let loaded = Loaded {
+        theme: ResolvedTheme::standard(),
+        available: Vec::new(),
+        selected: None,
+        issues: Vec::new(),
+        theme_dir: None,
+    };
+    loaded.state(&ThemeDirs { user: paths.themes_dir(), built_in: None })
 }
 
 fn settings_path(paths: &Paths) -> std::path::PathBuf {

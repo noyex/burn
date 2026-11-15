@@ -5,11 +5,13 @@
 //!   burn-cli import      import logs into the store, then summaries
 //!   burn-cli verify-t3   compare parsing and pricing with T3 Code's scan cache
 //!   burn-cli json        limits and summaries as JSON (what the UI receives)
+//!   burn-cli check-theme <name or path>   what is wrong with a theme (exit 0 when nothing)
 
 use burn_core::database::UsageDatabase;
 use burn_core::importer::{self, ImportProgress};
 use burn_core::parsers::{self, UsageRecord};
 use burn_core::rates::ModelRates;
+use burn_core::theme;
 use burn_core::{Paths, Period, ProviderId, limits};
 use chrono::{Local, TimeZone, Utc};
 use std::collections::BTreeMap;
@@ -26,11 +28,20 @@ fn main() {
         Some("import") => import(&paths),
         Some("verify-t3") => verify_t3(&paths),
         Some("json") => json(&paths),
+        Some("check-theme") => check_theme(&paths, std::env::args().nth(2).as_deref()),
         _ => {
-            eprintln!("usage: burn-cli dump | import | verify-t3 | json");
+            eprintln!("usage: burn-cli dump | import | verify-t3 | json | check-theme <name or path>");
             std::process::exit(2);
         }
     }
+}
+
+/// The same check `burn.exe --check-theme` runs.
+fn check_theme(paths: &Paths, argument: Option<&str>) -> ! {
+    let dirs = theme::ThemeDirs { user: paths.themes_dir(), built_in: theme::built_in_dir() };
+    let (code, text) = dirs.check(argument, &theme::font_installed);
+    println!("{text}");
+    std::process::exit(code);
 }
 
 fn dump_limits(paths: &Paths) {
