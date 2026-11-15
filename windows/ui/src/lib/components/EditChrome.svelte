@@ -85,7 +85,7 @@
     place-items: center;
     width: 22px;
     height: 22px;
-    border-radius: 50%;
+    border-radius: var(--pill);
     background: var(--surface);
     box-shadow:
       0 2px 8px var(--shadow),

@@ -1,8 +1,9 @@
-<!-- What the period's usage would have cost at API prices, on a lime block. -->
+<!-- What the period's usage would have cost at API prices, on the accent block. -->
 <script lang="ts">
   import { bucketLabel, money, tokens } from "../format";
   import { tip } from "../tip.svelte";
   import { PERIODS, PERIOD_TITLE, PROVIDERS, PROVIDER_NAME, type Period, type UsageSummary } from "../types";
+  import BlockArt from "./BlockArt.svelte";
   import Pulse from "./Pulse.svelte";
   import Segmented from "./Segmented.svelte";
   import SpendBars from "./SpendBars.svelte";
@@ -20,6 +21,7 @@
 </script>
 
 <div class="block spend">
+  <BlockArt fill="accent" />
   <div class="top">
     <span class="title" use:tip={"Estimated at API list prices"}>Spent</span>
     <Segmented options={PERIODS} selected={period} label={(p) => PERIOD_TITLE[p]} onSelect={onPeriod} ariaLabel="Period" />
@@ -51,8 +53,8 @@
 
 <style>
   .spend {
-    background: var(--lime);
-    color: var(--lime-ink);
+    background: var(--accent);
+    color: var(--accent-ink);
   }
   .top {
     display: flex;
@@ -101,7 +103,7 @@
   }
   .skel {
     display: block;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: currentColor;
     opacity: 0.1;
   }

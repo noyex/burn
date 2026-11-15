@@ -44,9 +44,9 @@
     position: relative;
     display: flex;
     padding: 3px;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: var(--switcher);
-    color: #fff;
+    color: var(--switcher-ink);
     box-shadow:
       0 4px 20px var(--shadow),
       inset 0 0 0 0.5px var(--hairline);
@@ -57,8 +57,8 @@
     left: 3px;
     width: 40px;
     height: 30px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.16);
+    border-radius: var(--pill);
+    background: color-mix(in srgb, var(--switcher-ink) 16%, transparent);
     transition: transform var(--snappy);
   }
   button {
@@ -67,7 +67,7 @@
     place-items: center;
     width: 40px;
     height: 30px;
-    border-radius: 999px;
+    border-radius: var(--pill);
     opacity: 0.5;
     transition:
       opacity 150ms ease-out,
@@ -89,7 +89,7 @@
     transform: scale(0.94);
   }
   button:focus-visible {
-    outline-color: #fff;
+    outline-color: var(--switcher-ink);
     outline-offset: -2px;
   }
 </style>

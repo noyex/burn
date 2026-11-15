@@ -1,17 +1,20 @@
 <!-- The panel (PopoverView.swift): provider cards, spend, and a footer, floating over the desktop. -->
 <script lang="ts">
   import { onMount } from "svelte";
-  import { contentResized, getState, hidePanel, onPanel, onState, setPeriod, shelfCopy, shelfDelete } from "./lib/api";
+  import { contentResized, getState, hidePanel, onPanel, onState, setPeriod, setTheme, shelfCopy, shelfDelete } from "./lib/api";
+  import { appearance } from "./lib/appearance.svelte";
   import { clock } from "./lib/clock.svelte";
-  import { demoUsage } from "./lib/demo";
+  import { demoTheme, demoUsage } from "./lib/demo";
   import { synced } from "./lib/format";
   import { customSize, hasCard, order, panelProviders, rows as arrange, sizes } from "./lib/layout";
-  import { pageIn, pageOut, reducedMotion } from "./lib/motion";
+  import { pageIn, pageOut, previewIn, reducedMotion } from "./lib/motion";
   import { cubicOut } from "svelte/easing";
   import { scale } from "svelte/transition";
   import { holdToEdit } from "./lib/press";
+  import { applyTheme } from "./lib/theme.svelte";
   import { reorder, setCardSize, setShelfExpanded, setShowsInPanel, setShowsSpending, setTab } from "./lib/settings";
   import { LOGIN_COMMAND, PROVIDERS, PROVIDER_NAME, type CardSize, type Period, type ProviderId, type Settings, type ShelfItem, type Snapshot, type Tab } from "./lib/types";
+  import BlockArt from "./lib/components/BlockArt.svelte";
   import CardGrid from "./lib/components/CardGrid.svelte";
   import CommandChip from "./lib/components/CommandChip.svelte";
   import EditChrome from "./lib/components/EditChrome.svelte";
@@ -35,6 +38,8 @@
   let view = $state<"usage" | "settings">("usage");
   /** The provider page open in settings. */
   let settingsProvider = $state<ProviderId | null>(null);
+  /** The theme page is open; the panel stands next to it as a live preview. */
+  let pickingTheme = $state(false);
   let editing = $state(false);
   /** Paths of the selected screenshots. */
   let selection = $state<string[]>([]);
@@ -44,12 +49,16 @@
   let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
   const USAGE_WIDTH = 304;
+  const PREVIEW_GAP = 14;
   const EXPANDED_WIDTH = 644;
   const tab = $derived(snap?.settings.tab ?? "usage");
   const expanded = $derived(snap?.settings.shelfExpanded ?? false);
   /** Doesn't depend on the tab, so the shelf keeps its grid while it fades out. */
   const shelfWidth = $derived(expanded ? EXPANDED_WIDTH : USAGE_WIDTH);
-  const contentWidth = $derived(view === "usage" && tab === "shelf" ? shelfWidth : USAGE_WIDTH);
+  const previewShown = $derived(view === "settings" && pickingTheme);
+  const contentWidth = $derived(
+    view === "settings" ? (previewShown ? USAGE_WIDTH * 2 + PREVIEW_GAP : USAGE_WIDTH) : tab === "shelf" ? shelfWidth : USAGE_WIDTH,
+  );
   const usageRow = $derived(tab === "usage" && !editing);
   const shelfRow = $derived(tab === "shelf");
   const editRow = $derived(tab === "usage" && editing);
@@ -72,6 +81,27 @@
     snap.settings = next;
     setSettings(next);
   }
+
+  /** The theme just picked, until the app reports it: snapshots sent meanwhile still name the old one. */
+  let pickedTheme = $state<string | null | undefined>(undefined);
+  const selectedTheme = $derived(snap && pickedTheme !== undefined ? pickedTheme : (snap?.theme.selected ?? null));
+
+  /** Marks the pick at once; the look follows when the app has read the file. */
+  function pickTheme(id: string | null) {
+    if (!snap) return;
+    if (isTauri) {
+      pickedTheme = id;
+      // Refused (the file is gone): show what is really on.
+      setTheme(id).catch(() => (pickedTheme = undefined));
+    } else snap.theme = demoTheme(id);
+  }
+
+  // Colors, shape and fonts of the active theme, for the appearance the system is in. Every
+  // snapshot carries the look again, so it is compared by value.
+  const look = $derived(snap ? JSON.stringify(snap.theme.look) : null);
+  $effect(() => {
+    if (look) applyTheme(JSON.parse(look), appearance.dark);
+  });
 
   function launchAtLogin(on: boolean) {
     if (!snap) return;
@@ -149,7 +179,10 @@
       const first = await getState();
       if (cancelled) return;
       snap = first;
-      await onState((s) => (snap = s));
+      await onState((s) => {
+        if (s.theme.selected === pickedTheme) pickedTheme = undefined;
+        snap = s;
+      });
       await onPanel(
         () => {
           clock.now = Date.now();
@@ -162,15 +195,17 @@
           editing = false;
           view = "usage";
           settingsProvider = null;
+          pickingTheme = false;
           selection = [];
           confirmingClear = false;
         },
       );
-      // Development aid for screenshots: `#settings`, `#settings/claude` or `#edit` opens there.
-      const [start, provider] = location.hash.slice(1).split("/");
+      // Development aid for screenshots: `#settings`, `#settings/claude`, `#settings/theme` or `#edit` opens there.
+      const [start, page] = location.hash.slice(1).split("/");
       if (start === "settings") {
         view = "settings";
-        settingsProvider = (provider as ProviderId) || null;
+        if (page === "theme") pickingTheme = true;
+        else settingsProvider = (page as ProviderId) || null;
       } else if (start === "edit") editing = true;
       else if (start === "shelf") snap.settings = setTab(snap.settings, "shelf");
     })();
@@ -202,23 +237,104 @@
   });
 </script>
 
+{#snippet usageBlocks()}
+  {#if snap}
+    {#if snap.connected.length === 0}
+      <div class="block neutral reveal" style:--i={0}>
+        <BlockArt fill="neutral" />
+        <p class="hint">Sign in to a provider in a terminal:</p>
+        {#each PROVIDERS as p (p)}
+          <div class="signin-row"><Glyph provider={p} size={12} /><CommandChip command={LOGIN_COMMAND[p]} /></div>
+        {/each}
+      </div>
+    {:else}
+      <CardGrid
+        {snap}
+        {cards}
+        rows={cardRows}
+        {sizeOf}
+        {editing}
+        onEdit={startEditing}
+        onHide={(p) => commit(setShowsInPanel(snap!.settings, p, false))}
+        onSize={(p, size: CardSize) => commit(setCardSize(snap!.settings, p, size, cards))}
+        onReorder={(next) => commit(reorder(snap!.settings, next))}
+      />
+      {#each issues as p (p)}
+        <div class="reveal" style:--i={cardRows.length} use:holdToEdit={editing ? null : startEditing}>
+          <EditChrome {editing} title={PROVIDER_NAME[p]} seed={PROVIDERS.indexOf(p) * 1.9} onHide={() => commit(setShowsInPanel(snap!.settings, p, false))}>
+            <IssueRow provider={p} state={snap.limits[p] ?? { state: "loading" }} />
+          </EditChrome>
+        </div>
+      {/each}
+    {/if}
+
+    {#if spendShown}
+      <div class="reveal" style:--i={cardRows.length + 1} use:holdToEdit={editing ? null : startEditing}>
+        <EditChrome {editing} title="Spent" seed={5.3} onHide={() => commit(setShowsSpending(snap!.settings, false))}>
+          {#if snap.hasUsage}
+            <SpendBlock usage={snap.usage} error={snap.usageError} period={snap.period} onPeriod={choosePeriod} />
+          {:else}
+            <div class="block importing">
+              <BlockArt fill="accent" />
+              <span>Importing usage from Claude Code and Codex logs…</span>
+              <div class="progress"><div style:width="{snap.importPercent ?? 0}%"></div></div>
+            </div>
+          {/if}
+        </EditChrome>
+      </div>
+    {/if}
+
+    {#if editing && (hiddenProviders.length > 0 || !snap.settings.showsSpending)}
+      <div class="hidden-list">
+        {#each hiddenProviders as p (p)}
+          <button class="add" aria-label="Show {PROVIDER_NAME[p]}" onclick={() => commit(setShowsInPanel(snap!.settings, p, true))}>
+            <Icons name="plus" size={9} />{PROVIDER_NAME[p]}
+          </button>
+        {/each}
+        {#if !snap.settings.showsSpending}
+          <button class="add" aria-label="Show Spent" onclick={() => commit(setShowsSpending(snap!.settings, true))}>
+            <Icons name="plus" size={9} />Spent
+          </button>
+        {/if}
+      </div>
+    {:else if !editing && panelEmpty}
+      <div class="block neutral empty reveal" style:--i={0}>
+        <BlockArt fill="neutral" />
+        <p class="hint">Everything is hidden from the panel</p>
+        <button class="pill-button prominent" onclick={startEditing}>Edit panel</button>
+      </div>
+    {/if}
+  {/if}
+{/snippet}
+
 <div class="root" bind:this={root}>
   {#if snap}
     <div class="content" class:visible style:width="{contentWidth}px">
       <div class="stage">
         {#if view === "settings"}
-          <div class="page" in:pageIn out:pageOut>
+          <div class="page beside" in:pageIn out:pageOut>
             <div class="block settings">
+              <BlockArt fill="surface" />
               <SettingsView
                 {snap}
                 bind:provider={settingsProvider}
+                bind:pickingTheme
+                {selectedTheme}
                 {commit}
+                onTheme={pickTheme}
                 onLaunch={launchAtLogin}
                 onBack={() => (view = "usage")}
                 onArrange={startEditing}
                 onQuit={quit}
               />
             </div>
+            {#if previewShown}
+              <!-- Only there to be looked at. -->
+              <div class="page preview" inert aria-hidden="true" in:previewIn>
+                <div class="top"><TabSwitcher selected="usage" onSelect={() => {}} /></div>
+                {@render usageBlocks()}
+              </div>
+            {/if}
           </div>
         {:else}
           <div class="page" in:pageIn out:pageOut>
@@ -240,68 +356,7 @@
             <div class="stage">
               {#if tab === "usage"}
                 <div class="page" in:pageIn out:pageOut>
-                {#if snap.connected.length === 0}
-                  <div class="block neutral reveal" style:--i={0}>
-                    <p class="hint">Sign in to a provider in a terminal:</p>
-                    {#each PROVIDERS as p (p)}
-                      <div class="signin-row"><Glyph provider={p} size={12} /><CommandChip command={LOGIN_COMMAND[p]} /></div>
-                    {/each}
-                  </div>
-                {:else}
-                  <CardGrid
-                    {snap}
-                    {cards}
-                    rows={cardRows}
-                    {sizeOf}
-                    {editing}
-                    onEdit={startEditing}
-                    onHide={(p) => commit(setShowsInPanel(snap!.settings, p, false))}
-                    onSize={(p, size: CardSize) => commit(setCardSize(snap!.settings, p, size, cards))}
-                    onReorder={(next) => commit(reorder(snap!.settings, next))}
-                  />
-                  {#each issues as p (p)}
-                    <div class="reveal" style:--i={cardRows.length} use:holdToEdit={editing ? null : startEditing}>
-                      <EditChrome {editing} title={PROVIDER_NAME[p]} seed={PROVIDERS.indexOf(p) * 1.9} onHide={() => commit(setShowsInPanel(snap!.settings, p, false))}>
-                        <IssueRow provider={p} state={snap.limits[p] ?? { state: "loading" }} />
-                      </EditChrome>
-                    </div>
-                  {/each}
-                {/if}
-
-                {#if spendShown}
-                  <div class="reveal" style:--i={cardRows.length + 1} use:holdToEdit={editing ? null : startEditing}>
-                    <EditChrome {editing} title="Spent" seed={5.3} onHide={() => commit(setShowsSpending(snap!.settings, false))}>
-                      {#if snap.hasUsage}
-                        <SpendBlock usage={snap.usage} error={snap.usageError} period={snap.period} onPeriod={choosePeriod} />
-                      {:else}
-                        <div class="block importing">
-                          <span>Importing usage from Claude Code and Codex logs…</span>
-                          <div class="progress"><div style:width="{snap.importPercent ?? 0}%"></div></div>
-                        </div>
-                      {/if}
-                    </EditChrome>
-                  </div>
-                {/if}
-
-                {#if editing && (hiddenProviders.length > 0 || !snap.settings.showsSpending)}
-                  <div class="hidden-list">
-                    {#each hiddenProviders as p (p)}
-                      <button class="add" aria-label="Show {PROVIDER_NAME[p]}" onclick={() => commit(setShowsInPanel(snap!.settings, p, true))}>
-                        <Icons name="plus" size={9} />{PROVIDER_NAME[p]}
-                      </button>
-                    {/each}
-                    {#if !snap.settings.showsSpending}
-                      <button class="add" aria-label="Show Spent" onclick={() => commit(setShowsSpending(snap!.settings, true))}>
-                        <Icons name="plus" size={9} />Spent
-                      </button>
-                    {/if}
-                  </div>
-                {:else if !editing && panelEmpty}
-                  <div class="block neutral empty reveal" style:--i={0}>
-                    <p class="hint">Everything is hidden from the panel</p>
-                    <button class="pill-button prominent" onclick={startEditing}>Edit panel</button>
-                  </div>
-                {/if}
+                  {@render usageBlocks()}
                 </div>
               {:else}
                 <div class="page" in:pageIn out:pageOut>
@@ -391,6 +446,16 @@
   .settings {
     background: var(--surface);
   }
+  /* Settings, and the panel next to it while a theme is being picked. */
+  .beside {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .beside > * {
+    flex: none;
+    width: 304px;
+  }
   /* Above the shelf's scroll area, which reaches a little past the grid for shadows. */
   .top {
     position: relative;
@@ -429,7 +494,7 @@
     gap: 5px;
     height: 32px;
     padding: 0 12px;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: var(--surface);
     font-size: 12px;
     font-weight: 700;
@@ -466,8 +531,8 @@
     gap: 8px;
   }
   .importing {
-    background: var(--lime);
-    color: var(--lime-ink);
+    background: var(--accent);
+    color: var(--accent-ink);
     font-size: 11px;
     display: flex;
     flex-direction: column;
@@ -476,12 +541,12 @@
   .progress {
     height: 4px;
     border-radius: 2px;
-    background: color-mix(in srgb, var(--lime-ink) 15%, transparent);
+    background: color-mix(in srgb, var(--accent-ink) 15%, transparent);
     overflow: hidden;
   }
   .progress div {
     height: 100%;
-    background: var(--lime-ink);
+    background: var(--accent-ink);
     transition: width 300ms var(--ease-out);
   }
   .footer {
@@ -489,7 +554,7 @@
     min-height: 36px;
     margin-top: 2px;
     padding: 4px 4px 4px 12px;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: var(--surface);
     box-shadow:
       0 4px 20px var(--shadow),

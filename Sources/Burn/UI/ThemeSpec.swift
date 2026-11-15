@@ -321,8 +321,21 @@ struct ResolvedTheme: Equatable, Sendable {
             if let fonts = raw as? [String: Any] {
                 func family(_ key: String) -> String? {
                     guard let value = fonts[key] else { return nil }
+                    let bad = "fonts.\(key): must be a font family name or a list of them."
+                    if let list = value as? [Any] {
+                        let names = list.compactMap { $0 as? String }.filter { !$0.isEmpty }
+                        guard !list.isEmpty, names.count == list.count else {
+                            issues.append(bad)
+                            return nil
+                        }
+                        guard let found = names.first(where: fontExists) else {
+                            issues.append("fonts.\(key): none of \(names.map { "\"\($0)\"" }.joined(separator: ", ")) is installed on this computer.")
+                            return nil
+                        }
+                        return found
+                    }
                     guard let name = value as? String, !name.isEmpty else {
-                        issues.append("fonts.\(key): must be a font family name.")
+                        issues.append(bad)
                         return nil
                     }
                     guard fontExists(name) else {

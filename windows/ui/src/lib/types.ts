@@ -85,6 +85,61 @@ export interface ShelfItem {
   height: number;
 }
 
+/** A color as CSS: `#RRGGBB`, `#RRGGBBAA`, or `var(--token)` when it follows another token. */
+export type ThemePaint = string;
+
+/** What a theme draws on a block over its fill (`docs/themes.md`, "Block backgrounds"). */
+export interface ThemeBackground {
+  gradient?: { colors: ThemePaint[]; angle: number };
+  /** `version` changes when the file does, so the picture reloads. */
+  image?: { path: string; opacity: number; version: number };
+  pattern?: { type: "dots" | "grid" | "lines"; color: ThemePaint; opacity: number; spacing: number; size: number; fade: "top" | "bottom" | null };
+}
+
+/** The active theme: only what it changes, laid over the defaults in `theme.css`. */
+export interface ThemeLook {
+  /** Token key to color, for each appearance. */
+  light: Record<string, string>;
+  dark: Record<string, string>;
+  radius: number;
+  gap: number;
+  pill: number;
+  textFont: string | null;
+  displayFont: string | null;
+  /** By the token of the block's fill. */
+  backgrounds: Record<string, ThemeBackground>;
+}
+
+/** Up to three colors that tell a theme apart, per appearance. */
+export interface ThemeSwatch {
+  light: string[];
+  dark: string[];
+}
+
+export interface ThemeEntry {
+  /** File name without `.json`. */
+  id: string;
+  title: string;
+  builtIn: boolean;
+  swatch: ThemeSwatch;
+}
+
+/** Mirrors `burn-core/src/theme.rs` `ThemeState`. */
+export interface ThemeState {
+  /** Null is the built-in look. */
+  selected: string | null;
+  title: string;
+  available: ThemeEntry[];
+  defaultSwatch: ThemeSwatch;
+  /** What's wrong with the selected theme. */
+  issues: string[];
+  folder: string;
+  /** Prompts the user pastes to a coding agent. */
+  agentPrompt: string;
+  ideasPrompt: string;
+  look: ThemeLook;
+}
+
 export interface Snapshot {
   connected: ProviderId[];
   limits: Partial<Record<ProviderId, LimitState>>;
@@ -98,6 +153,7 @@ export interface Snapshot {
   /** Newest first. */
   shelf: ShelfItem[];
   settings: Settings;
+  theme: ThemeState;
   /** Whether Windows starts Burn at login. */
   launchAtLogin: boolean;
   version: string;

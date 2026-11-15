@@ -26,7 +26,7 @@ Live rate limits for Claude Code, Codex and Cursor, plus what your usage would h
 - **Usage**: cost, tokens and a per-provider chart for today, this week, this month and all time, computed locally from Claude Code and Codex session logs.
 - **Share**: copies an image of your spend to the clipboard, ready to paste anywhere.
 - **Settings**: choose which providers appear in the menu bar and which limit each one shows; launch at login.
-- **Themes**: pick a built-in theme, or change colors, backgrounds, corners, spacing and fonts with a JSON file. Your coding agent can write one for you. Updates never overwrite it. See [docs/themes.md](docs/themes.md) (macOS for now).
+- **Themes**: pick a built-in theme, or change colors, backgrounds, corners, spacing and fonts with a JSON file. Your coding agent can write one for you. Updates never overwrite it. See [docs/themes.md](docs/themes.md).
 
 Native SwiftUI + AppKit, no Electron, no dependencies, about 1 MB. Runs on Apple silicon and Intel.
 

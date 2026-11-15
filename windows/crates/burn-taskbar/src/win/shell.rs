@@ -30,7 +30,7 @@ use super::render::Painter;
 use super::taskbar::{Taskbar, dump_tree};
 use super::util::{hwnd_id, light_taskbar, log, to_rect, wide};
 use crate::layout::{Edge, Rect, widget_rect, work_clear_of_taskbar};
-use crate::model::Entry;
+use crate::model::{AlertColors, Entry, LevelColors};
 
 const HOST_CLASS: PCWSTR = w!("BurnHost");
 const WIDGET_CLASS: PCWSTR = w!("BurnWidget");
@@ -100,6 +100,8 @@ fn host() -> Option<Rc<dyn Host>> {
 struct DrawKey {
     taskbar: Taskbar,
     light: bool,
+    /// The theme's colors for this light or dark taskbar.
+    colors: LevelColors,
     hovered: bool,
     entries: Vec<Entry>,
 }
@@ -110,6 +112,7 @@ struct Shell {
     widget: Option<HWND>,
     painter: Painter,
     entries: Vec<Entry>,
+    alert_colors: AlertColors,
     tray_only: bool,
     hovered: bool,
     drawn: Option<DrawKey>,
@@ -168,6 +171,7 @@ pub fn start(host: Rc<dyn Host>, entries: Vec<Entry>, tray_only: bool) -> window
                 widget: None,
                 painter,
                 entries,
+                alert_colors: AlertColors::default(),
                 tray_only,
                 hovered: false,
                 drawn: None,
@@ -191,6 +195,16 @@ pub fn set_entries(entries: Vec<Entry>) {
     with_shell(|s| {
         if s.entries != entries {
             s.entries = entries;
+            s.refresh(false);
+        }
+    });
+}
+
+/// The theme's colors for the percentage at 20% left and at 0%; the widget repaints when they change.
+pub fn set_alert_colors(colors: AlertColors) {
+    with_shell(|s| {
+        if s.alert_colors != colors {
+            s.alert_colors = colors;
             s.refresh(false);
         }
     });
@@ -296,7 +310,9 @@ impl Shell {
         }
         let Some(widget) = self.widget else { return false };
 
-        let key = DrawKey { taskbar, light: light_taskbar(), hovered: self.hovered, entries: self.entries.clone() };
+        let light = light_taskbar();
+        let colors = if light { self.alert_colors.light } else { self.alert_colors.dark };
+        let key = DrawKey { taskbar, light, colors, hovered: self.hovered, entries: self.entries.clone() };
         if !force && self.drawn.as_ref() == Some(&key) {
             self.keep_on_top(widget, taskbar.hwnd);
             return true;
@@ -331,7 +347,14 @@ impl Shell {
             self.widget_rect = None;
             return true;
         }
-        let frame = match self.painter.widget(&key.entries, taskbar.dpi, taskbar.thickness(), key.light, key.hovered) {
+        let frame = match self.painter.widget(
+            &key.entries,
+            taskbar.dpi,
+            taskbar.thickness(),
+            key.light,
+            key.colors,
+            key.hovered,
+        ) {
             Ok(f) => f,
             Err(e) => {
                 log!("rendering the widget failed: {e:?}");

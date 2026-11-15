@@ -12,7 +12,7 @@
     flex: none;
     width: 30px;
     height: 18px;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: color-mix(in srgb, var(--text) 18%, transparent);
     transition: background 150ms ease-out;
   }
@@ -25,18 +25,17 @@
     left: 2px;
     width: 14px;
     height: 14px;
-    border-radius: 50%;
+    border-radius: var(--pill);
     background: var(--raised);
     box-shadow: 0 1px 2px var(--shadow);
     transition:
       transform 180ms var(--ease-out),
       background 150ms ease-out;
   }
-  @media (prefers-color-scheme: dark) {
-    /* The raised fill would vanish into the dark track. */
-    .knob {
-      background: var(--secondary);
-    }
+  /* On dark blocks the raised fill would vanish into the track. Set by theme.svelte.ts from the
+     actual fill, as a theme can be dark in the light appearance. */
+  :global(:root[data-blocks="dark"]) .switch:not(.on) .knob {
+    background: var(--secondary);
   }
   .on .knob {
     transform: translateX(12px);

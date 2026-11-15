@@ -38,7 +38,7 @@
     height: 28px;
     min-width: 28px;
     padding: 0 8px;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: var(--neutral);
     color: var(--secondary);
     transition:

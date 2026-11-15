@@ -12,9 +12,8 @@ export function level(used: number): Level {
 export const BRAND: Record<ProviderId, CardColor> = { claude: "coral", codex: "mono", cursor: "lavender" };
 
 /** Alert text inside a pill filled with the block's ink, readable on light and dark ink alike. */
-export function alertColor(l: Level, color: CardColor, dark: boolean): string {
-  const lightInk = color === "coral" || (color === "mono" && !dark);
+export function alertColor(l: Level, color: CardColor, lightInk: boolean): string {
   if (l === "normal") return `var(--${color}-ink)`;
-  if (l === "warn") return lightInk ? "var(--warn-on-light-ink)" : "var(--warn-on-dark-ink)";
-  return lightInk ? "var(--full-on-light-ink)" : "var(--full-on-dark-ink)";
+  if (l === "warn") return lightInk ? "var(--warn-on-light)" : "var(--warn-on-dark)";
+  return lightInk ? "var(--full-on-light)" : "var(--full-on-dark)";
 }

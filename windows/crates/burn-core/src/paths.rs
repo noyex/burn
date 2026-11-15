@@ -47,6 +47,11 @@ impl Paths {
         self.data_dir.join("model-rates.json")
     }
 
+    /// The user's themes folder: `<name>.json` themes, `active.txt` and the guide.
+    pub fn themes_dir(&self) -> PathBuf {
+        self.data_dir.join("themes")
+    }
+
     pub fn claude_projects(&self) -> PathBuf {
         self.home.join(".claude").join("projects")
     }

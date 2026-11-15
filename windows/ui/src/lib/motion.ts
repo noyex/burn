@@ -24,3 +24,13 @@ export function pageOut(node: HTMLElement) {
   node.style.pointerEvents = "none";
   return fade(node, { duration: reducedMotion() ? 0 : 120 });
 }
+
+/** The panel preview slides in from under the theme page. */
+export function previewIn(node: HTMLElement) {
+  const reduced = reducedMotion();
+  return {
+    duration: reduced ? 0 : 220,
+    easing: cubicOut,
+    css: (t: number) => `opacity: ${t}; transform: ${reduced ? "none" : `translateX(${(t - 1) * 12}px)`}`,
+  };
+}

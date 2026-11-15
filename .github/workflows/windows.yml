@@ -2,10 +2,10 @@ name: Windows
 
 on:
   pull_request:
-    paths: ["windows/**", ".github/workflows/windows.yml"]
+    paths: ["windows/**", "assets/Themes/**", "assets/Fonts/**", "docs/themes.md", ".github/workflows/windows.yml"]
   push:
     branches: [main]
-    paths: ["windows/**", ".github/workflows/windows.yml"]
+    paths: ["windows/**", "assets/Themes/**", "assets/Fonts/**", "docs/themes.md", ".github/workflows/windows.yml"]
   workflow_dispatch:
 
 permissions:
@@ -40,6 +40,9 @@ jobs:
           npm run check
           npm test
           npm run build
+      - name: Theme literals
+        shell: bash
+        run: bash scripts/check-theme-literals.sh
       - name: Format
         run: cargo fmt --check
       - name: Lint

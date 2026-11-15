@@ -1,6 +1,7 @@
 // Demo data for working on the UI outside the app (same values as docs/screenshot.png).
 
-import type { Period, ProviderId, Settings, ShelfItem, Snapshot, UsageBucket, UsageSummary } from "./types";
+import type { Period, ProviderId, Settings, ShelfItem, Snapshot, ThemeState, UsageBucket, UsageSummary } from "./types";
+import fixture from "./demo-themes.json";
 
 const h = 3_600_000;
 const d = 24 * h;
@@ -21,6 +22,16 @@ const settings: Settings = {
   shelfRetentionDays: 7,
   trayOnly: false,
 };
+
+/** The themes that ship with Burn as the app would report them (kept current by `burn-core/tests/demo_themes.rs`). */
+const themes = fixture as unknown as { state: ThemeState; looks: Record<string, ThemeState["look"]> };
+
+/** The demo state with `id` turned on; null or an unknown name is the built-in look. */
+export function demoTheme(id: string | null): ThemeState {
+  const entry = themes.state.available.find((t) => t.id === id);
+  if (!entry) return themes.state;
+  return { ...themes.state, selected: entry.id, title: entry.title, look: themes.looks[entry.id] };
+}
 
 const SHAPES: [number, number][] = [[1920, 1080], [1280, 720], [2560, 1440], [800, 600], [1920, 1080], [1600, 900], [1366, 768], [1920, 1200], [1024, 768]];
 const shelf: ShelfItem[] = SHAPES.map(([width, height], i) => ({
@@ -56,7 +67,7 @@ function usage(period: Period): UsageSummary {
   return { period, cost, tokens: Math.round(cost * 2_200_000), byProvider, buckets, unit };
 }
 
-export function demoSnapshot(kind: string | null, period: Period = "week"): Snapshot {
+export function demoSnapshot(kind: string | null, period: Period = "week", theme: string | null = null): Snapshot {
   const now = Date.now();
   const base: Snapshot = {
     connected: ["claude", "codex", "cursor"],
@@ -100,6 +111,7 @@ export function demoSnapshot(kind: string | null, period: Period = "week"): Snap
     hasUsage: true,
     shelf,
     settings,
+    theme: demoTheme(theme),
     launchAtLogin: true,
     update: null,
     updating: false,

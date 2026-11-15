@@ -51,6 +51,9 @@
       "nsis"
     ],
     "createUpdaterArtifacts": true,
+    "resources": {
+      "../../../assets/Themes/*": "built-in-themes/"
+    },
     "publisher": "noyex",
     "homepage": "https://github.com/noyex/burn",
     "shortDescription": "AI subscription limits and spend in the taskbar",

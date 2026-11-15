@@ -209,9 +209,13 @@ func runCheckTheme(_ argument: String?) -> Int32 {
         print("Usage: Burn --check-theme <theme name or path to .json>")
         return 2
     }
-    let url = argument.contains("/") || argument.hasSuffix(".json")
+    var url = argument.contains("/") || argument.hasSuffix(".json")
         ? URL(fileURLWithPath: argument)
         : ThemeStore.file(for: argument)
+    // `midnight.json` is a file here, or else the theme of that name, as in `active.txt`.
+    if !argument.contains("/"), argument.hasSuffix(".json"), !FileManager.default.fileExists(atPath: url.path) {
+        url = ThemeStore.file(for: String(argument.dropLast(5)))
+    }
     guard let (theme, issues) = ThemeStore.loadFile(url) else {
         print("Can't read \(url.path)")
         return 2

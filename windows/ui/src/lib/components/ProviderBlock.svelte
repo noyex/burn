@@ -4,13 +4,14 @@
   bar of what's left.
 -->
 <script lang="ts">
-  import { appearance } from "../appearance.svelte";
   import { clock } from "../clock.svelte";
   import { remaining, reset, resetsSoon } from "../format";
   import { alertColor, level } from "../level";
+  import { theme } from "../theme.svelte";
   import { tip } from "../tip.svelte";
   import { PROVIDER_NAME, limitsOf, type CardColor, type CardSize, type LimitState, type LimitWindow, type ProviderId } from "../types";
   import BigPercent from "./BigPercent.svelte";
+  import BlockArt from "./BlockArt.svelte";
   import Glyph from "./Glyph.svelte";
   import Icons from "./Icons.svelte";
   import Pulse from "./Pulse.svelte";
@@ -62,7 +63,7 @@
       <span
         class="pill"
         style:background="var(--{color}-ink)"
-        style:color={alertColor(primaryLevel, color, appearance.dark)}
+        style:color={alertColor(primaryLevel, color, theme.lightInk[color])}
         use:tip={alertTip(primary)}
       >
         {primaryLevel === "full" ? "Empty" : "Low"}
@@ -96,6 +97,7 @@
   role="group"
   aria-label={name}
 >
+  <BlockArt fill={color} />
   {#if limits && primary}
     {#if size === "s"}
       {#snippet value()}
@@ -204,7 +206,7 @@
     font-size: 10px;
     font-weight: 700;
     padding: 1px 6px;
-    border-radius: 999px;
+    border-radius: var(--pill);
   }
   .grow {
     flex: 1;
@@ -290,7 +292,7 @@
   }
   .skel {
     display: block;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: currentColor;
     opacity: 0.16;
   }

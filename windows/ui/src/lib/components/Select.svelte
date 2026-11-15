@@ -30,7 +30,7 @@
     height: 30px;
     padding: 0 26px 0 12px;
     border: 0;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: color-mix(in srgb, var(--text) 6%, transparent);
     color: var(--text);
     font: inherit;
@@ -39,7 +39,7 @@
     transition: background 150ms ease-out;
   }
   /* The open list is drawn natively: give it the theme's colours, or dark mode puts light text
-     on the default white popup. */
+     on the system's light popup. */
   option {
     background: var(--raised);
     color: var(--text);
