@@ -10,7 +10,7 @@ use chrono::{DateTime, Datelike};
 use resvg::{tiny_skia, usvg};
 use std::fmt::Write as _;
 use std::path::Path;
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc, LazyLock, Mutex};
 
 /// Card size in points; the PNG is this times the render scale.
 pub const WIDTH: f32 = 600.0;
@@ -42,12 +42,26 @@ fn bundled_fonts() -> usvg::fontdb::Database {
 /// Only the bundled fonts: all a card needs unless the theme names a font.
 static FONTS: LazyLock<Arc<usvg::fontdb::Database>> = LazyLock::new(|| Arc::new(bundled_fonts()));
 
-/// The bundled fonts plus everything installed, loaded once the first time a theme asks for a font.
-static FONTS_WITH_SYSTEM: LazyLock<Arc<usvg::fontdb::Database>> = LazyLock::new(|| {
-    let mut db = bundled_fonts();
-    db.load_system_fonts();
-    Arc::new(db)
-});
+/// The bundled fonts plus everything installed, for a theme that names a font. Built from the
+/// scan `theme.rs` keeps, and again only when that scan was redone.
+fn fonts_with_system() -> Arc<usvg::fontdb::Database> {
+    type Built = (Arc<usvg::fontdb::Database>, Arc<usvg::fontdb::Database>);
+    static BUILT: Mutex<Option<Built>> = Mutex::new(None);
+    let system = crate::theme::system_fonts();
+    let mut built = BUILT.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((from, all)) = &*built
+        && Arc::ptr_eq(from, &system)
+    {
+        return all.clone();
+    }
+    let mut db = (*system).clone();
+    for data in [FONT_MEDIUM, FONT_BOLD, FONT_DISPLAY] {
+        db.load_font_data(data.to_vec());
+    }
+    let all = Arc::new(db);
+    *built = Some((system, all.clone()));
+    all
+}
 
 /// What the card is drawn and measured with: the family lists of the two text styles and the font
 /// database that holds them.
@@ -62,10 +76,14 @@ struct Fonts {
 impl Fonts {
     fn new(theme: &ResolvedTheme) -> Fonts {
         let themed = theme.text_font.is_some() || theme.display_font.is_some();
-        let db = if themed { FONTS_WITH_SYSTEM.clone() } else { FONTS.clone() };
+        let db = if themed { fonts_with_system() } else { FONTS.clone() };
+        // The font database matches names exactly; the theme may spell one in another case.
+        let spelled = |name: &Option<String>| {
+            name.as_deref().map(|n| crate::theme::installed_family(n).unwrap_or_else(|| n.to_string()))
+        };
         Fonts {
-            text: family_list(theme.text_font.as_deref(), TEXT),
-            display: family_list(theme.display_font.as_deref(), DISPLAY),
+            text: family_list(spelled(&theme.text_font).as_deref(), TEXT),
+            display: family_list(spelled(&theme.display_font).as_deref(), DISPLAY),
             opts: usvg::Options { fontdb: db, ..Default::default() },
         }
     }
@@ -516,7 +534,7 @@ fn pattern_svg(out: &mut String, id: u32, pattern: &Pattern, color: Rgba, b: &Re
 /// The picture as a data URI, when it is a regular PNG or JPEG file of a sensible size. Anything
 /// else (missing, a folder, too big, another format, a path out of the folder) is skipped.
 fn picture_uri(dir: &Path, file: &str) -> Option<String> {
-    if file.is_empty() || file.contains(['/', '\\']) || file.starts_with('.') {
+    if file.is_empty() || file.contains(['/', '\\', ':']) || file.starts_with('.') {
         return None;
     }
     let path = dir.join(file);

@@ -6,12 +6,12 @@
 
 use serde::Serialize;
 use serde_json::{Map, Value};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
-use std::time::UNIX_EPOCH;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 /// An sRGB color with alpha, written in themes as `#RGB`, `#RRGGBB` or `#RRGGBBAA`.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -460,7 +460,8 @@ impl ResolvedTheme {
         image_exists: &dyn Fn(&str) -> bool,
     ) -> (ResolvedTheme, Vec<String>) {
         let mut theme = ResolvedTheme { name: fallback_name.to_string(), ..ResolvedTheme::default() };
-        let data = data.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(data);
+        let decoded = decode(data);
+        let data = &*decoded;
         let root = match serde_json::from_slice::<Value>(data) {
             Ok(Value::Object(object)) => object,
             Ok(Value::Array(_)) => return (theme, vec!["The file must be a JSON object.".into()]),
@@ -683,7 +684,7 @@ impl Parser {
         let at = format!("{path}.image");
         self.unknown_keys(image, &at, &["file", "opacity"]);
         match image.get("file").and_then(Value::as_str) {
-            Some(file) if !file.is_empty() && !file.contains(['/', '\\']) && !file.starts_with('.') => {
+            Some(file) if !file.is_empty() && !file.contains(['/', '\\', ':']) && !file.starts_with('.') => {
                 if image_exists(file) {
                     let opacity = self.number(image, "opacity", &at, (0.0, 1.0)).unwrap_or(1.0);
                     Some(Image { file: file.to_string(), opacity })
@@ -755,19 +756,68 @@ fn short(value: f64) -> String {
 
 // MARK: fonts
 
-/// Lowercased family names of the fonts installed on this computer, built on first use.
-fn installed_families() -> &'static HashSet<String> {
-    static FAMILIES: OnceLock<HashSet<String>> = OnceLock::new();
-    FAMILIES.get_or_init(|| {
-        let mut db = resvg::usvg::fontdb::Database::new();
-        db.load_system_fonts();
-        db.faces().flat_map(|face| face.families.iter().map(|(name, _)| name.to_lowercase())).collect()
+/// The fonts installed on this computer. Scanning them takes a moment, so one scan is kept.
+struct SystemFonts {
+    db: Arc<resvg::usvg::fontdb::Database>,
+    /// Lowercased family name to the name as the font spells it.
+    families: HashMap<String, String>,
+    scanned: Instant,
+}
+
+static SYSTEM_FONTS: Mutex<Option<SystemFonts>> = Mutex::new(None);
+/// A name that isn't found triggers a new scan, so a font installed while Burn runs is picked
+/// up, but not more often than this.
+const RESCAN_AFTER: Duration = Duration::from_secs(5);
+
+fn scan_fonts() -> SystemFonts {
+    let mut db = resvg::usvg::fontdb::Database::new();
+    db.load_system_fonts();
+    let families =
+        db.faces().flat_map(|face| face.families.iter().map(|(name, _)| (name.to_lowercase(), name.clone()))).collect();
+    SystemFonts { db: Arc::new(db), families, scanned: Instant::now() }
+}
+
+fn with_system_fonts<T>(read: impl FnOnce(&mut SystemFonts) -> T) -> T {
+    let mut fonts = SYSTEM_FONTS.lock().unwrap_or_else(|e| e.into_inner());
+    read(fonts.get_or_insert_with(scan_fonts))
+}
+
+/// The installed font family `name` stands for, ignoring case, spelled the way the font spells
+/// it. `None` when it isn't installed.
+pub fn installed_family(name: &str) -> Option<String> {
+    let key = name.to_lowercase();
+    with_system_fonts(|fonts| {
+        if !fonts.families.contains_key(&key) && fonts.scanned.elapsed() >= RESCAN_AFTER {
+            *fonts = scan_fonts();
+        }
+        fonts.families.get(&key).cloned()
     })
 }
 
 /// Whether a font family is installed, ignoring case.
 pub fn font_installed(name: &str) -> bool {
-    installed_families().contains(&name.to_lowercase())
+    installed_family(name).is_some()
+}
+
+/// The database of installed fonts, for drawing with one of them.
+pub fn system_fonts() -> Arc<resvg::usvg::fontdb::Database> {
+    with_system_fonts(|fonts| fonts.db.clone())
+}
+
+/// A theme file or `active.txt` as text. Windows PowerShell writes UTF-16 with `>` and may add a
+/// byte order mark; both are read like plain UTF-8. Anything else is passed on as it is.
+fn decode(data: &[u8]) -> std::borrow::Cow<'_, [u8]> {
+    use std::borrow::Cow;
+    let utf16 = |bytes: &[u8], read: fn([u8; 2]) -> u16| {
+        let units: Vec<u16> = bytes.as_chunks::<2>().0.iter().map(|pair| read(*pair)).collect();
+        Cow::Owned(String::from_utf16_lossy(&units).into_bytes())
+    };
+    match data {
+        [0xEF, 0xBB, 0xBF, rest @ ..] => Cow::Borrowed(rest),
+        [0xFF, 0xFE, rest @ ..] => utf16(rest, u16::from_le_bytes),
+        [0xFE, 0xFF, rest @ ..] => utf16(rest, u16::from_be_bytes),
+        _ => Cow::Borrowed(data),
+    }
 }
 
 // MARK: folder
@@ -872,7 +922,9 @@ impl ThemeDirs {
             shipped.into_iter().filter(|t| !own.iter().any(|o| o.id.to_lowercase() == t.id.to_lowercase())).collect();
         available.extend(own);
 
-        let mut name = fs::read_to_string(self.user.join("active.txt")).ok().map(|s| s.trim().to_string());
+        let mut name = fs::read(self.user.join("active.txt"))
+            .ok()
+            .map(|data| String::from_utf8_lossy(&decode(&data)).trim().to_string());
         if let Some(n) = &mut name
             && let Some(stem) = n.strip_suffix(".json")
         {
@@ -893,7 +945,7 @@ impl ThemeDirs {
         let mut theme_dir = None;
         if let Some(n) = &name {
             // A name, never a path out of the themes folder.
-            if n.contains(['/', '\\']) || n.starts_with('.') {
+            if n.contains(['/', '\\', ':']) || n.starts_with('.') {
                 issues.push("active.txt must hold a theme's file name, not a path.".to_string());
             } else {
                 let file = self.file_for(n);
@@ -957,10 +1009,13 @@ impl ThemeDirs {
         let Some(argument) = argument else {
             return (2, "Usage: burn --check-theme <theme name or path to .json>".into());
         };
-        let path = if argument.contains(['/', '\\']) || argument.ends_with(".json") {
-            PathBuf::from(argument)
-        } else {
-            self.file_for(argument)
+        let is_path = argument.contains(['/', '\\']);
+        let path = match argument.strip_suffix(".json") {
+            // `midnight.json` is a file here, or else the theme of that name, as in `active.txt`.
+            Some(name) if !is_path && !Path::new(argument).exists() => self.file_for(name),
+            Some(_) => PathBuf::from(argument),
+            None if is_path => PathBuf::from(argument),
+            None => self.file_for(argument),
         };
         let Some((theme, issues)) = read_theme(&path, font_exists) else {
             return (2, format!("Can't read {}", path.display()));
@@ -1530,6 +1585,63 @@ mod tests {
 
     fn all_fonts(_: &str) -> bool {
         true
+    }
+
+    #[test]
+    fn installed_family_is_spelled_like_the_font() {
+        if cfg!(target_os = "macos") {
+            assert_eq!(installed_family("menlo").as_deref(), Some("Menlo"));
+        }
+        assert_eq!(installed_family("Definitely Not A Font 123"), None);
+    }
+
+    #[test]
+    fn reads_what_powershell_writes() {
+        let utf16: Vec<u8> =
+            [0xFF, 0xFE].into_iter().chain("{\"name\": \"Żar\"}".encode_utf16().flat_map(u16::to_le_bytes)).collect();
+        let (theme, issues) = ResolvedTheme::parse(&utf16, "file", &|_| true, &|_| true);
+        assert!(issues.is_empty(), "{issues:?}");
+        assert_eq!(theme.name, "Żar");
+        let (theme, issues) = ResolvedTheme::parse(b"\xEF\xBB\xBF{\"name\": \"Bom\"}", "file", &|_| true, &|_| true);
+        assert!(issues.is_empty(), "{issues:?}");
+        assert_eq!(theme.name, "Bom");
+
+        let tmp = Tmp::new();
+        let dirs = ThemeDirs { user: tmp.0.clone(), built_in: None };
+        fs::write(tmp.0.join("midnight.json"), "{}").unwrap();
+        // `echo midnight > active.txt` in Windows PowerShell: UTF-16 with a mark and a line end.
+        let name: Vec<u8> =
+            [0xFF, 0xFE].into_iter().chain("midnight\r\n".encode_utf16().flat_map(u16::to_le_bytes)).collect();
+        fs::write(tmp.0.join("active.txt"), name).unwrap();
+        let loaded = dirs.load(&|_| true);
+        assert_eq!(loaded.selected.as_deref(), Some("midnight"));
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+    }
+
+    #[test]
+    fn a_drive_prefix_is_a_path_too() {
+        let (theme, issues) = ResolvedTheme::parse(
+            br#"{"backgrounds": {"accent": {"image": {"file": "D:secret.png"}}}}"#,
+            "file",
+            &|_| true,
+            &|_| true,
+        );
+        assert_eq!(issues.len(), 1);
+        assert!(theme.backgrounds.is_empty());
+
+        let tmp = Tmp::new();
+        let dirs = ThemeDirs { user: tmp.0.clone(), built_in: None };
+        fs::write(tmp.0.join("active.txt"), "C:foo").unwrap();
+        assert_eq!(dirs.load(&|_| true).issues, vec!["active.txt must hold a theme's file name, not a path."]);
+    }
+
+    #[test]
+    fn check_takes_a_name_with_the_extension() {
+        let tmp = Tmp::new();
+        let dirs = ThemeDirs { user: tmp.0.clone(), built_in: None };
+        fs::write(tmp.0.join("midnight.json"), r#"{"name": "Midnight"}"#).unwrap();
+        assert_eq!(dirs.check(Some("midnight.json"), &|_| true), (0, "OK: \"Midnight\" has no problems.".to_string()));
+        assert_eq!(dirs.check(Some("nope.json"), &|_| true).0, 2);
     }
 
     #[test]
