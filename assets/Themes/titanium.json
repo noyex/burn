@@ -1,0 +1,21 @@
+{
+  "name": "Titanium",
+  "colors": {
+    "base": "#111214", "surface": "#17181B", "neutral": "#1C1D21", "neutral-hover": "#24262B", "raised": "#34363C",
+    "text": "#ECEDEF", "secondary": "#8E9198", "switcher": "#1C1D21", "switcher-ink": "#ECEDEF",
+    "hairline": "#FFFFFF1F", "shadow": "#00000099",
+    "accent": "#2A2C31", "accent-ink": "#F4F5F7",
+    "coral": "#1C1D21", "coral-ink": "#ECEDEF", "mono": "#1C1D21", "mono-ink": "#ECEDEF",
+    "lavender": "#1C1D21", "lavender-ink": "#ECEDEF", "sky": "#1C1D21", "sky-ink": "#ECEDEF",
+    "selection": "#C7CBD3"
+  },
+  "shape": { "radius": 12, "gap": 6 },
+  "backgrounds": {
+    "accent": { "gradient": { "colors": ["#4A4E57", "#2A2C31", "#1C1D21"], "angle": 160 }, "pattern": { "type": "lines", "color": "#FFFFFF", "opacity": 0.05, "spacing": 3, "size": 0.5 } },
+    "coral": { "gradient": { "colors": ["#FFFFFF14", "#FFFFFF00"] }, "pattern": { "type": "lines", "color": "#FFFFFF", "opacity": 0.035, "spacing": 3, "size": 0.5 } },
+    "mono": { "gradient": { "colors": ["#FFFFFF14", "#FFFFFF00"] }, "pattern": { "type": "lines", "color": "#FFFFFF", "opacity": 0.035, "spacing": 3, "size": 0.5 } },
+    "lavender": { "gradient": { "colors": ["#FFFFFF14", "#FFFFFF00"] }, "pattern": { "type": "lines", "color": "#FFFFFF", "opacity": 0.035, "spacing": 3, "size": 0.5 } },
+    "sky": { "gradient": { "colors": ["#FFFFFF14", "#FFFFFF00"] }, "pattern": { "type": "lines", "color": "#FFFFFF", "opacity": 0.035, "spacing": 3, "size": 0.5 } },
+    "surface": { "gradient": { "colors": ["#FFFFFF0A", "#FFFFFF00"] } }
+  }
+}

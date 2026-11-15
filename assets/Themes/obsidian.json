@@ -1,0 +1,21 @@
+{
+  "name": "Obsidian",
+  "colors": {
+    "base": "#0A0908", "surface": "#11100E", "neutral": "#161412", "neutral-hover": "#1F1C19", "raised": "#2E2A25",
+    "text": "#F4EFE6", "secondary": "#8F877A", "switcher": "#161412", "switcher-ink": "#E8C887",
+    "hairline": "#D4AF6A2E", "shadow": "#000000A6",
+    "accent": "#161412", "accent-ink": "#E8C887",
+    "coral": "#11100E", "coral-ink": "#F4EFE6", "mono": "#11100E", "mono-ink": "#F4EFE6",
+    "lavender": "#11100E", "lavender-ink": "#F4EFE6", "sky": "#11100E", "sky-ink": "#F4EFE6",
+    "selection": "#D4AF6A"
+  },
+  "shape": { "radius": 10, "gap": 6 },
+  "backgrounds": {
+    "accent": { "gradient": { "colors": ["#D4AF6A00", "#D4AF6A0A", "#D4AF6A33"], "angle": 160 }, "pattern": { "type": "lines", "color": "#D4AF6A", "opacity": 0.07, "spacing": 4, "size": 0.5 } },
+    "coral": { "gradient": { "colors": ["#D4AF6A00", "#D4AF6A1A"], "angle": 160 } },
+    "mono": { "gradient": { "colors": ["#D4AF6A00", "#D4AF6A1A"], "angle": 160 } },
+    "lavender": { "gradient": { "colors": ["#D4AF6A00", "#D4AF6A1A"], "angle": 160 } },
+    "sky": { "gradient": { "colors": ["#D4AF6A00", "#D4AF6A1A"], "angle": 160 } },
+    "surface": { "gradient": { "colors": ["#D4AF6A00", "#D4AF6A0F"], "angle": 160 } }
+  }
+}
