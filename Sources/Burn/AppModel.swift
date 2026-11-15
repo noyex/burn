@@ -56,6 +56,7 @@ final class AppModel {
     @ObservationIgnored private var limitsFetchedAt: Date?
     @ObservationIgnored private var refreshingLimits = false
     @ObservationIgnored private var timers: [Timer] = []
+    @ObservationIgnored private var checkingUpdates = false
 
     init() {
         shelf = ShelfStore(settings: settings)
@@ -67,9 +68,10 @@ final class AppModel {
         Task { await loadUsage(); await sync() }
         schedule(every: 120) { [weak self] in await self?.refreshLimits() }
         schedule(every: 300) { [weak self] in await self?.sync() }
+        self.checkingUpdates = checkingUpdates
         if checkingUpdates {
             Task { await updater.check() }
-            schedule(every: 86_400) { [weak self] in await self?.updater.check() }
+            schedule(every: 6 * 3600) { [weak self] in await self?.updater.check() }
         }
     }
 
@@ -79,6 +81,10 @@ final class AppModel {
         }
         if (lastSync.map { Date.now.timeIntervalSince($0) > 60 }) ?? true {
             Task { await sync() }
+        }
+        // A release shows up the next time the user looks, not hours later.
+        if checkingUpdates, (updater.checkedAt.map { Date.now.timeIntervalSince($0) > 3600 }) ?? true {
+            Task { await updater.check() }
         }
     }
 
