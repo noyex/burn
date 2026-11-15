@@ -27,7 +27,10 @@ describe("theme", () => {
   it("has every built-in theme in the demo", () => {
     const all = demoTheme(null);
     expect(all.selected).toBeNull();
-    expect(all.available.map((t) => t.id)).toEqual(["blueprint", "carbon", "glow-dots", "paper", "sunset", "terminal"]);
+    expect(all.available.map((t) => t.id)).toEqual([
+      "aurora", "blueprint", "carbon", "circuit", "ember", "frost", "glow-dots",
+      "obsidian", "paper", "prism", "sunset", "terminal", "titanium",
+    ]);
     for (const t of all.available) {
       const picked = demoTheme(t.id);
       expect(picked.selected).toBe(t.id);
