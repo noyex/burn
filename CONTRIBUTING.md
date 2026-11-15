@@ -62,7 +62,7 @@ until the description has an image or video. If you only refactored UI code and 
 say so in the description and a maintainer will add the `no-ui` label.
 
 `.build/debug/Burn --preview` opens the popover in a plain window, which is the easiest way to capture it.
-Add `--dark` or `--light` to force an appearance and `--settings` to open it on Settings.
+Add `--dark` or `--light` to force an appearance `--settings` to open it on Settings and `--themes` on the theme page.
 
 ### Network and privacy
 

@@ -15,7 +15,9 @@ struct PopoverView: View {
     let model: AppModel
     let canvas: PanelCanvas
     /// `--settings` opens the preview window on Settings, for screenshots.
-    @State private var showingSettings = CommandLine.arguments.contains("--settings")
+    @State private var showingSettings = CommandLine.arguments.contains("--settings") || CommandLine.arguments.contains("--themes")
+    /// `--themes` opens it on the theme page.
+    @State private var pickingTheme = CommandLine.arguments.contains("--themes")
     @State private var selection: Set<URL> = []
     @State private var confirmingClear = false
     @State private var copiedSelection = false
@@ -36,7 +38,13 @@ struct PopoverView: View {
     /// Doesn't depend on the tab, so the shelf keeps its grid while it fades out.
     private var shelfWidth: CGFloat { model.settings.shelfExpanded ? Self.expandedWidth : Self.usageWidth }
     /// Width of the blocks; the panel adds room for their shadows around it.
-    private var width: CGFloat { !showingSettings && model.settings.tab == .shelf ? shelfWidth : Self.usageWidth }
+    private var width: CGFloat {
+        if showingSettings { return previewShown ? Self.usageWidth * 2 + Self.previewGap : Self.usageWidth }
+        return model.settings.tab == .shelf ? shelfWidth : Self.usageWidth
+    }
+    /// While a theme is being picked, the panel stands next to Settings as a live preview.
+    private var previewShown: Bool { showingSettings && pickingTheme }
+    private static let previewGap: CGFloat = 14
     /// Left edge of the content on the canvas: centered under the icon, kept on screen. Comes
     /// from the same state as `width`, so the two animate in step.
     private var contentX: CGFloat {
@@ -48,16 +56,30 @@ struct PopoverView: View {
         let visible = model.popoverVisible
         ZStack(alignment: .topLeading) {
             if showingSettings {
-                SettingsView(model: model) {
-                    withAnimation(.snappy(duration: 0.25)) { showingSettings = false }
-                } onArrange: {
-                    withAnimation(.snappy(duration: 0.25)) {
-                        showingSettings = false
-                        model.settings.tab = .usage
-                        model.editingPanel = true
+                HStack(alignment: .top, spacing: Self.previewGap) {
+                    SettingsView(model: model, onBack: {
+                        withAnimation(.snappy(duration: 0.25)) { showingSettings = false }
+                    }, onArrange: {
+                        withAnimation(.snappy(duration: 0.25)) {
+                            showingSettings = false
+                            model.settings.tab = .usage
+                            model.editingPanel = true
+                        }
+                    }, pickingTheme: $pickingTheme)
+                    .block(.surface)
+                    .frame(width: Self.usageWidth)
+                    if previewShown {
+                        VStack(alignment: .leading, spacing: Bento.gap) {
+                            IconSwitcher(selection: .constant(.usage)).padding(.bottom, 2)
+                            usage
+                        }
+                        .frame(width: Self.usageWidth)
+                        // Only there to be looked at.
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(x: -12)))
                     }
                 }
-                .block(.surface)
                 .transition(tabTransition)
             } else {
                 main.transition(tabTransition)
