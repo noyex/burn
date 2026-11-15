@@ -9,7 +9,12 @@
   import Icons from "./Icons.svelte";
   import RoundButton from "./RoundButton.svelte";
 
-  let { theme, onPick, onBack }: { theme: ThemeState; onPick: (id: string | null) => void; onBack: () => void } = $props();
+  let {
+    theme,
+    selected,
+    onPick,
+    onBack,
+  }: { theme: ThemeState; selected: string | null; onPick: (id: string | null) => void; onBack: () => void } = $props();
 
   /** The prompt just copied, to confirm it on its button. */
   let copied = $state<string | null>(null);
@@ -47,7 +52,7 @@
 
 <div class="grid" role="radiogroup" aria-label="Theme">
   {#each tiles as t (t.id)}
-    {@const on = theme.selected === t.id}
+    {@const on = selected === t.id}
     <button class="tile" class:on role="radio" aria-checked={on} aria-label={t.title} onclick={() => onPick(t.id)}>
       <span class="ring"><span class="orb" style:background={orb(t.swatch)}></span></span>
       <span class="name">{t.title}</span>

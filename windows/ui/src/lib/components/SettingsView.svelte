@@ -46,6 +46,7 @@
     snap,
     provider = $bindable(null),
     pickingTheme = $bindable(false),
+    selectedTheme,
     commit,
     onTheme,
     onLaunch,
@@ -58,6 +59,8 @@
     provider: ProviderId | null;
     /** The theme page is open. */
     pickingTheme: boolean;
+    /** The theme marked as on; ahead of `snap.theme` right after a pick. */
+    selectedTheme: string | null;
     commit: (next: Settings) => void;
     /** A theme was picked; null is the built-in look. */
     onTheme: (id: string | null) => void;
@@ -122,7 +125,7 @@
 
 <div class="settings">
   {#if pickingTheme}
-    <ThemeView theme={snap.theme} onPick={onTheme} onBack={() => (pickingTheme = false)} />
+    <ThemeView theme={snap.theme} selected={selectedTheme} onPick={onTheme} onBack={() => (pickingTheme = false)} />
   {:else if provider}
     {@const p = provider}
     {@const main = windowOptions(p, cardWindowId(s, p))}

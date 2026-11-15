@@ -82,19 +82,25 @@
     setSettings(next);
   }
 
+  /** The theme just picked, until the app reports it: snapshots sent meanwhile still name the old one. */
+  let pickedTheme = $state<string | null | undefined>(undefined);
+  const selectedTheme = $derived(snap && pickedTheme !== undefined ? pickedTheme : (snap?.theme.selected ?? null));
+
   /** Marks the pick at once; the look follows when the app has read the file. */
   function pickTheme(id: string | null) {
     if (!snap) return;
     if (isTauri) {
-      snap.theme.selected = id;
+      pickedTheme = id;
       // Refused (the file is gone): show what is really on.
-      setTheme(id).catch(async () => (snap = await getState()));
+      setTheme(id).catch(() => (pickedTheme = undefined));
     } else snap.theme = demoTheme(id);
   }
 
-  // Colors, shape and fonts of the active theme, for the appearance the system is in.
+  // Colors, shape and fonts of the active theme, for the appearance the system is in. Every
+  // snapshot carries the look again, so it is compared by value.
+  const look = $derived(snap ? JSON.stringify(snap.theme.look) : null);
   $effect(() => {
-    if (snap) applyTheme(snap.theme.look, appearance.dark);
+    if (look) applyTheme(JSON.parse(look), appearance.dark);
   });
 
   function launchAtLogin(on: boolean) {
@@ -173,7 +179,10 @@
       const first = await getState();
       if (cancelled) return;
       snap = first;
-      await onState((s) => (snap = s));
+      await onState((s) => {
+        if (s.theme.selected === pickedTheme) pickedTheme = undefined;
+        snap = s;
+      });
       await onPanel(
         () => {
           clock.now = Date.now();
@@ -310,6 +319,7 @@
                 {snap}
                 bind:provider={settingsProvider}
                 bind:pickingTheme
+                {selectedTheme}
                 {commit}
                 onTheme={pickTheme}
                 onLaunch={launchAtLogin}
