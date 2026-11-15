@@ -118,7 +118,7 @@ impl Themes {
         });
         // Fonts are scanned on the first load, which is why this runs off the UI thread.
         self.reload();
-        let _watcher = match watcher {
+        let mut watcher = match watcher {
             Ok(w) => w,
             Err(e) => return crate::log!("watching {}: {e}", self.dirs.user.display()),
         };
@@ -130,6 +130,16 @@ impl Themes {
                     Err(RecvTimeoutError::Timeout) => break,
                     Err(RecvTimeoutError::Disconnected) => return,
                 }
+            }
+            // The folder was deleted or replaced: the watch died with it. Bring both back.
+            if !self.dirs.user.is_dir() {
+                let _ = watcher.unwatch(&self.dirs.user);
+                let _ = std::fs::create_dir_all(&self.dirs.user);
+                self.dirs.write_guide(GUIDE);
+                if let Err(e) = watcher.watch(&self.dirs.user, RecursiveMode::NonRecursive) {
+                    crate::log!("watching {} again: {e}", self.dirs.user.display());
+                }
+                relevant = true;
             }
             if relevant {
                 self.reload();
