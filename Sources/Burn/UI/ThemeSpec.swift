@@ -205,10 +205,30 @@ struct ResolvedTheme: Equatable, Sendable {
         (isDark ? dark : light)[token] ?? token.standard(dark: isDark)
     }
 
-    /// The `name` a theme file gives itself, without resolving the rest of it.
-    static func title(of data: Data) -> String? {
-        let name = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["name"] as? String
-        return name?.isEmpty == false ? name : nil
+    /// Up to three colors that tell this theme from the others, most important first.
+    func swatch(dark isDark: Bool) -> [RGBA] {
+        func resolve(_ paint: BlockBackground.Paint) -> RGBA? {
+            switch paint {
+            case let .color(rgba): rgba
+            case let .token(token): color(token, dark: isDark)
+            }
+        }
+        var candidates: [RGBA?] = [color(.coral, dark: isDark), color(.accent, dark: isDark)]
+        // A theme whose blocks share one fill is told apart by what it draws on them.
+        for slot in [ThemeToken.coral, .accent] {
+            if let pattern = backgrounds[slot]?.pattern { candidates.append(resolve(pattern.color)) }
+            candidates += backgrounds[slot]?.gradient?.colors.map(resolve) ?? []
+        }
+        candidates += [ThemeToken.lavender, .sky, .mono, .text, .secondary].map { color($0, dark: isDark) }
+        var picked: [RGBA] = []
+        for case let candidate? in candidates where candidate.a > 0.5 && picked.count < 3 {
+            let distinct = picked.allSatisfy { other in
+                let d = [candidate.r - other.r, candidate.g - other.g, candidate.b - other.b]
+                return (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).squareRoot() > 0.12
+            }
+            if distinct { picked.append(candidate) }
+        }
+        return picked.isEmpty ? [RGBA(hex: 0x808080)] : picked
     }
 
     /// Reads a theme file. Never fails: anything it can't use is skipped and reported in `issues`.

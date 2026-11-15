@@ -25,6 +25,8 @@ final class ThemeStore {
         let title: String
         /// Ships inside the app rather than living in the user's folder.
         var builtIn = false
+        /// The parsed theme, for its preview in Settings.
+        var look = ResolvedTheme.standard
     }
 
     /// Ready-made themes inside the app. A file of the same name in the user's folder wins.
@@ -75,6 +77,12 @@ final class ThemeStore {
         return loaded
     }
 
+    /// Name of the theme in use, for Settings.
+    var selectedTitle: String {
+        guard let selected else { return "Default" }
+        return available.first { $0.id == selected }?.title ?? selected
+    }
+
     func openFolder() {
         NSWorkspace.shared.open(Self.directory)
     }
@@ -94,24 +102,24 @@ final class ThemeStore {
             + "Burn → Settings → Theme."
     }
 
-    static func loadFile(_ url: URL) -> (theme: ResolvedTheme, issues: [String])? {
+    /// `families` saves asking AppKit for the font list once per file when loading many.
+    static func loadFile(_ url: URL, families: Set<String>? = nil) -> (theme: ResolvedTheme, issues: [String])? {
         guard let data = try? Data(contentsOf: url) else { return nil }
-        return ResolvedTheme.parse(data, name: url.deletingPathExtension().lastPathComponent, fontExists: fontExists) {
-            FileManager.default.fileExists(atPath: url.deletingLastPathComponent().appendingPathComponent($0).path)
-        }
-    }
-
-    private static func fontExists(_ name: String) -> Bool {
-        NSFontManager.shared.availableFontFamilies.contains(name) || NSFont(name: name, size: 12) != nil
+        let families = families ?? Set(NSFontManager.shared.availableFontFamilies)
+        return ResolvedTheme.parse(data, name: url.deletingPathExtension().lastPathComponent,
+                                   fontExists: { families.contains($0) || NSFont(name: $0, size: 12) != nil },
+                                   imageExists: { FileManager.default.fileExists(atPath: url.deletingLastPathComponent().appendingPathComponent($0).path) })
     }
 
     private func reload() {
         let files = (try? FileManager.default.contentsOfDirectory(at: Self.directory, includingPropertiesForKeys: nil)) ?? []
+        let families = Set(NSFontManager.shared.availableFontFamilies)
         func list(_ urls: [URL], builtIn: Bool) -> [Entry] {
             urls.filter { $0.pathExtension == "json" }
                 .map { url -> Entry in
                     let id = url.deletingPathExtension().lastPathComponent
-                    return Entry(id: id, title: (try? Data(contentsOf: url)).flatMap(ResolvedTheme.title) ?? id, builtIn: builtIn)
+                    let look = Self.loadFile(url, families: families)?.theme
+                    return Entry(id: id, title: look?.name ?? id, builtIn: builtIn, look: look ?? .standard)
                 }
                 .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
         }
@@ -133,7 +141,7 @@ final class ThemeStore {
             // A name, never a path out of the themes folder.
             if name.contains("/") || name.hasPrefix(".") {
                 problems = ["active.txt must hold a theme's file name, not a path."]
-            } else if let loaded = Self.loadFile(Self.file(for: name)) {
+            } else if let loaded = Self.loadFile(Self.file(for: name), families: families) {
                 (next, problems) = loaded
             } else {
                 problems = ["Theme \"\(name)\" isn't in the themes folder."]
