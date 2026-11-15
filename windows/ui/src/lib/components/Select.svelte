@@ -38,6 +38,12 @@
     cursor: pointer;
     transition: background 150ms ease-out;
   }
+  /* The open list is drawn natively: give it the theme's colours, or dark mode puts light text
+     on the default white popup. */
+  option {
+    background: var(--raised);
+    color: var(--text);
+  }
   select:hover {
     background: color-mix(in srgb, var(--text) 10%, transparent);
   }

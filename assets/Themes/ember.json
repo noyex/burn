@@ -1,0 +1,21 @@
+{
+  "name": "Ember",
+  "colors": {
+    "base": "#0A0706", "surface": "#100B09", "neutral": "#16100D", "neutral-hover": "#1F1612", "raised": "#2E211B",
+    "text": "#FBF1EC", "secondary": "#8F7D74", "switcher": "#100B09", "switcher-ink": "#FF7A3D",
+    "hairline": "#FFFFFF17", "shadow": "#00000099",
+    "accent": "#100B09", "accent-ink": "#FBF1EC",
+    "coral": "#100B09", "coral-ink": "#FBF1EC", "mono": "#100B09", "mono-ink": "#FBF1EC",
+    "lavender": "#100B09", "lavender-ink": "#FBF1EC", "sky": "#100B09", "sky-ink": "#FBF1EC",
+    "selection": "#FF5A1F"
+  },
+  "shape": { "radius": 14, "gap": 8 },
+  "backgrounds": {
+    "accent": { "gradient": { "colors": ["#FF5A1F00", "#FF5A1F00", "#FF5A1F4D"] }, "pattern": { "type": "dots", "color": "#FF6A2A", "opacity": 0.8, "spacing": 4, "size": 1.1, "fade": "top" } },
+    "coral": { "gradient": { "colors": ["#FF5A1F00", "#FF5A1F33"] }, "pattern": { "type": "dots", "color": "#FF6A2A", "opacity": 0.7, "spacing": 4, "size": 1.1, "fade": "top" } },
+    "mono": { "gradient": { "colors": ["#FF5A1F00", "#FF5A1F33"] }, "pattern": { "type": "dots", "color": "#FF6A2A", "opacity": 0.7, "spacing": 4, "size": 1.1, "fade": "top" } },
+    "lavender": { "gradient": { "colors": ["#FF5A1F00", "#FF5A1F33"] }, "pattern": { "type": "dots", "color": "#FF6A2A", "opacity": 0.7, "spacing": 4, "size": 1.1, "fade": "top" } },
+    "sky": { "gradient": { "colors": ["#FF5A1F00", "#FF5A1F33"] }, "pattern": { "type": "dots", "color": "#FF6A2A", "opacity": 0.7, "spacing": 4, "size": 1.1, "fade": "top" } },
+    "surface": { "pattern": { "type": "dots", "color": "#FF6A2A", "opacity": 0.45, "spacing": 4, "size": 1, "fade": "top" } }
+  }
+}

@@ -2,7 +2,7 @@
 // shows it right away and sends the whole thing to the app.
 
 import { customSizeOf, defaultWindow, merge, order, sizes } from "./layout";
-import type { CardColor, CardSize, PanelLayout, PanelOrder, ProviderId, Settings, Tab } from "./types";
+import type { CardColor, CardSize, LimitWindow, PanelLayout, PanelOrder, ProviderId, Settings, Tab } from "./types";
 
 const without = (list: ProviderId[], p: ProviderId) => list.filter((x) => x !== p);
 
@@ -23,6 +23,23 @@ export const widgetWindow = (s: Settings, p: ProviderId) => s.widgetWindows[p] ?
 
 export function setWidgetWindow(s: Settings, p: ProviderId, id: string): Settings {
   return { ...s, widgetWindows: { ...s.widgetWindows, [p]: id } };
+}
+
+/** What a limit picker offers: `highest`, then every window the provider reports; null when there is
+    nothing to choose. `combo` adds the taskbar's choices that show several windows at once. */
+export function windowOptions(windows: LimitWindow[], current: string, combo = false) {
+  if (windows.length < 2) return null;
+  const has = (id: string) => windows.some((w) => w.id === id);
+  const options = [{ id: "highest", label: "Most used" }, ...windows.map((w) => ({ id: w.id, label: w.label }))];
+  // A saved combo stays listed while the provider reports fewer windows: the widget still follows it.
+  if (combo && (current === "5h,week" || (has("5h") && has("week")))) {
+    options.splice(1, 0, { id: "5h,week", label: "5h + Week" });
+  }
+  // `all` leaves out minor caps, so offer it only when that still means more than two windows.
+  if (combo && (current === "all" || windows.filter((w) => !w.minor).length > 2)) {
+    options.splice(1, 0, { id: "all", label: "All" });
+  }
+  return { value: options.some((o) => o.id === current) ? current : "highest", options };
 }
 
 /** Window id shown big on the card, or `highest`. Separate from the taskbar choice. */

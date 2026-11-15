@@ -16,8 +16,9 @@ import {
   showsInPanel,
   showsInWidget,
   widgetWindow,
+  windowOptions,
 } from "./settings";
-import type { Settings } from "./types";
+import type { LimitWindow, Settings } from "./types";
 
 const base = (): Settings => ({ ...demoSnapshot(null).settings, providerOrder: ["claude", "codex", "cursor"] });
 
@@ -53,6 +54,26 @@ describe("settings changes", () => {
     const c = setCardWindow(s, "claude", "highest");
     expect(cardWindowId(c, "claude")).toBe("highest");
     expect(widgetWindow(c, "claude")).toBe("5h");
+  });
+
+  it("offers the taskbar several windows at once", () => {
+    const win = (id: string, minor = false): LimitWindow => ({ id, label: id, percent: 0, resetsAt: null, minor });
+    const ids = (windows: LimitWindow[], current: string, combo = true) => windowOptions(windows, current, combo)?.options.map((o) => o.id);
+    const claude = [win("5h"), win("week"), win("week_fable", true)];
+
+    expect(windowOptions([win("5h")], "5h", true)).toBeNull();
+    // The card only ever shows one window.
+    expect(ids(claude, "5h", false)).toEqual(["highest", "5h", "week", "week_fable"]);
+    // `all` would only repeat 5h + Week here: a minor cap doesn't count.
+    expect(ids(claude, "5h")).toEqual(["highest", "5h,week", "5h", "week", "week_fable"]);
+    expect(ids([...claude, win("week_opus")], "5h")).toEqual(["highest", "all", "5h,week", "5h", "week", "week_fable", "week_opus"]);
+    expect(windowOptions(claude, "gone", true)?.value).toBe("highest");
+
+    // The widget keeps following a saved combo when the provider reports less, so it stays selected.
+    const less = [win("5h"), win("week_fable", true)];
+    expect(windowOptions(less, "5h,week", true)?.value).toBe("5h,week");
+    expect(windowOptions(claude, "all", true)?.value).toBe("all");
+    expect(ids(less, "5h")).toEqual(["highest", "5h", "week_fable"]);
   });
 
   it("sets a card color", () => {

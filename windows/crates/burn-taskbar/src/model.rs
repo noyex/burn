@@ -25,6 +25,8 @@ pub struct Entry {
     pub used: f64,
     /// Seconds until the limit resets.
     pub resets_in: Option<u64>,
+    /// Drawn with the provider's logo; false for a provider's further windows.
+    pub logo: bool,
 }
 
 /// Colors (`0xRRGGBB`) a theme puts on the percentage in place of the built-in orange and red.
@@ -120,9 +122,9 @@ mod tests {
 
     #[test]
     fn labels() {
-        let full = Entry { provider: Provider::Claude, used: 100.0, resets_in: Some(7_800) };
+        let full = Entry { provider: Provider::Claude, used: 100.0, resets_in: Some(7_800), logo: true };
         assert_eq!(label(&full), "0% · 2h");
-        let normal = Entry { provider: Provider::Codex, used: 42.4, resets_in: Some(60) };
+        let normal = Entry { provider: Provider::Codex, used: 42.4, resets_in: Some(60), logo: true };
         assert_eq!(label(&normal), "58%");
         assert_eq!(short_reset(59), "1m");
         assert_eq!(reset(7_800), "2h 10m");
