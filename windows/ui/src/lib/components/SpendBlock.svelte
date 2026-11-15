@@ -51,8 +51,8 @@
 
 <style>
   .spend {
-    background: var(--lime);
-    color: var(--lime-ink);
+    background: var(--accent);
+    color: var(--accent-ink);
   }
   .top {
     display: flex;
@@ -101,7 +101,7 @@
   }
   .skel {
     display: block;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: currentColor;
     opacity: 0.1;
   }

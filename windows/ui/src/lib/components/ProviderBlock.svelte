@@ -204,7 +204,7 @@
     font-size: 10px;
     font-weight: 700;
     padding: 1px 6px;
-    border-radius: 999px;
+    border-radius: var(--pill);
   }
   .grow {
     flex: 1;
@@ -290,7 +290,7 @@
   }
   .skel {
     display: block;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: currentColor;
     opacity: 0.16;
   }

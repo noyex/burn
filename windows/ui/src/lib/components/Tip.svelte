@@ -36,7 +36,7 @@
     top: 0;
     max-width: 240px;
     padding: 5px 8px;
-    border-radius: 8px;
+    border-radius: var(--radius-small);
     background: var(--surface);
     color: var(--text);
     font-size: 11px;

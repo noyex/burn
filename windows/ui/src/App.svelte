@@ -429,7 +429,7 @@
     gap: 5px;
     height: 32px;
     padding: 0 12px;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: var(--surface);
     font-size: 12px;
     font-weight: 700;
@@ -466,8 +466,8 @@
     gap: 8px;
   }
   .importing {
-    background: var(--lime);
-    color: var(--lime-ink);
+    background: var(--accent);
+    color: var(--accent-ink);
     font-size: 11px;
     display: flex;
     flex-direction: column;
@@ -476,12 +476,12 @@
   .progress {
     height: 4px;
     border-radius: 2px;
-    background: color-mix(in srgb, var(--lime-ink) 15%, transparent);
+    background: color-mix(in srgb, var(--accent-ink) 15%, transparent);
     overflow: hidden;
   }
   .progress div {
     height: 100%;
-    background: var(--lime-ink);
+    background: var(--accent-ink);
     transition: width 300ms var(--ease-out);
   }
   .footer {
@@ -489,7 +489,7 @@
     min-height: 36px;
     margin-top: 2px;
     padding: 4px 4px 4px 12px;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: var(--surface);
     box-shadow:
       0 4px 20px var(--shadow),

@@ -123,12 +123,12 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 0 0 0.5px var(--photo-edge);
     transition: box-shadow 150ms ease-out;
     pointer-events: none;
   }
   .tile.selected::after {
-    box-shadow: inset 0 0 0 3px var(--text);
+    box-shadow: inset 0 0 0 3px var(--selection);
   }
   .check {
     position: absolute;
@@ -139,10 +139,10 @@
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--photo-scrim);
     box-shadow:
-      inset 0 0 0 1.5px rgba(255, 255, 255, 0.9),
-      0 1px 3px rgba(0, 0, 0, 0.3);
+      inset 0 0 0 1.5px color-mix(in srgb, var(--on-photo) 90%, transparent),
+      0 1px 3px var(--photo-shadow);
     color: transparent;
     opacity: 0;
     transform: scale(0.8);
@@ -160,7 +160,7 @@
   }
   .check.on {
     background: var(--text);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 1px 3px var(--photo-shadow);
     color: var(--base);
   }
   .copied {
@@ -173,7 +173,7 @@
     height: 24px;
     padding: 0 10px;
     margin: -12px 0 0;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: var(--surface);
     color: var(--text);
     font-size: 11px;

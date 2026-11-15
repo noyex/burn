@@ -12,7 +12,7 @@
     flex: none;
     width: 30px;
     height: 18px;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: color-mix(in srgb, var(--text) 18%, transparent);
     transition: background 150ms ease-out;
   }
@@ -25,7 +25,7 @@
     left: 2px;
     width: 14px;
     height: 14px;
-    border-radius: 50%;
+    border-radius: var(--pill);
     background: var(--raised);
     box-shadow: 0 1px 2px var(--shadow);
     transition:

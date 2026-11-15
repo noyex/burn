@@ -38,7 +38,7 @@
     gap: 6px;
     height: 22px;
     padding: 0 7px;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: color-mix(in srgb, var(--text) 7%, transparent);
     transition: background 150ms ease-out;
   }

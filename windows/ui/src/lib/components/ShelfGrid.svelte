@@ -70,8 +70,8 @@
     align-items: center;
     gap: 4px;
     padding: 36px 12px;
-    background: var(--lime);
-    color: var(--lime-ink);
+    background: var(--accent);
+    color: var(--accent-ink);
     text-align: center;
   }
   .title {

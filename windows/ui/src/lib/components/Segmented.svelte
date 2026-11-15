@@ -51,11 +51,11 @@
     position: relative;
     display: flex;
     padding: 2px;
-    border-radius: 999px;
-    --track: color-mix(in srgb, var(--lime-ink) 8%, transparent);
-    --thumb: var(--lime-ink);
-    --on: var(--lime);
-    --off: color-mix(in srgb, var(--lime-ink) 70%, transparent);
+    border-radius: var(--pill);
+    --track: color-mix(in srgb, var(--accent-ink) 8%, transparent);
+    --thumb: var(--accent-ink);
+    --on: var(--accent);
+    --off: color-mix(in srgb, var(--accent-ink) 70%, transparent);
     background: var(--track);
   }
   .neutral {
@@ -76,7 +76,7 @@
     top: 2px;
     left: 0;
     height: 22px;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: var(--thumb);
   }
   .thumb.ready {
@@ -88,7 +88,7 @@
     position: relative;
     height: 22px;
     padding: 0 8px;
-    border-radius: 999px;
+    border-radius: var(--pill);
     font-size: 11px;
     color: var(--off);
     transition: color 150ms ease-out;

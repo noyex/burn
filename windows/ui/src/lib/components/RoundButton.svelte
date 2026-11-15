@@ -29,7 +29,7 @@
     display: grid;
     place-items: center;
     flex: none;
-    border-radius: 50%;
+    border-radius: var(--pill);
     background: var(--neutral);
     color: var(--secondary);
     transition:

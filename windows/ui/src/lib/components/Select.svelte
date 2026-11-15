@@ -30,7 +30,7 @@
     height: 30px;
     padding: 0 26px 0 12px;
     border: 0;
-    border-radius: 999px;
+    border-radius: var(--pill);
     background: color-mix(in srgb, var(--text) 6%, transparent);
     color: var(--text);
     font: inherit;
