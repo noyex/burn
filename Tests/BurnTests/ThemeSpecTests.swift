@@ -115,6 +115,27 @@ struct ThemeSpecTests {
         #expect(theme.displayFont == "Avenir Next")
     }
 
+    @Test func fontListUsesFirstInstalled() {
+        let (theme, issues) = parse(##"{"fonts": {"text": ["Nope", "Second", "Third"], "display": ["Third"]}}"##) { $0 == "Second" || $0 == "Third" }
+        #expect(issues.isEmpty)
+        #expect(theme.textFont == "Second")
+        #expect(theme.displayFont == "Third")
+    }
+
+    @Test func fontListWithNoneInstalled() {
+        let (theme, issues) = parse(##"{"fonts": {"text": ["A", "B"]}}"##) { _ in false }
+        #expect(issues == ["fonts.text: none of \"A\", \"B\" is installed on this computer."])
+        #expect(theme.textFont == nil)
+    }
+
+    @Test func fontBadShapes() {
+        for bad in ["5", "\"\"", "[]", "[1]", "[\"A\", \"\"]", "[\"A\", 2]", "true"] {
+            let (theme, issues) = parse("{\"fonts\": {\"text\": \(bad)}}")
+            #expect(issues == ["fonts.text: must be a font family name or a list of them."], "\(bad): \(issues)")
+            #expect(theme.textFont == nil)
+        }
+    }
+
     @Test func builtInThemesHaveNoProblems() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let files = try FileManager.default.contentsOfDirectory(at: root.appendingPathComponent("assets/Themes"), includingPropertiesForKeys: nil)

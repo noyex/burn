@@ -10,7 +10,7 @@
     "warn-on-light": "#7A4A00", "full-on-light": "#8A1010", "selection": "#4DFF88"
   },
   "shape": { "radius": 0, "pill": 0, "gap": 4 },
-  "fonts": { "text": "Menlo" },
+  "fonts": { "text": ["Menlo", "Cascadia Mono", "Consolas"] },
   "backgrounds": {
     "coral": { "pattern": { "type": "grid", "color": "#4DFF88", "opacity": 0.12, "spacing": 12, "size": 0.5 } },
     "mono": { "pattern": { "type": "grid", "color": "#4DFF88", "opacity": 0.12, "spacing": 12, "size": 0.5 } },
