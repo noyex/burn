@@ -15,8 +15,9 @@ Burn watches the folder: save a file and the open panel changes within a second,
 
 ## Built-in themes
 
-Burn ships with a few ready-made themes, listed in Settings → Theme above your own: `blueprint`,
-`carbon`, `glow-dots`, `paper`, `sunset` and `terminal`. Their names work in `active.txt` too.
+Burn ships with a few ready-made themes, listed in Settings → Theme above your own: `aurora`,
+`blueprint`, `carbon`, `circuit`, `ember`, `frost`, `glow-dots`, `obsidian`, `paper`, `prism`,
+`sunset`, `terminal` and `titanium`. Their names work in `active.txt` too.
 
 Their files are inside the app, in `/Applications/Burn.app/Contents/Resources/Themes/`, and an
 update replaces them. To change one, copy it into your themes folder and edit the copy: a file
