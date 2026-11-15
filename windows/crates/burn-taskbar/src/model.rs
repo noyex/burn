@@ -27,6 +27,21 @@ pub struct Entry {
     pub resets_in: Option<u64>,
 }
 
+/// Colors (`0xRRGGBB`) a theme puts on the percentage in place of the built-in orange and red.
+/// `None` keeps the built-in color.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LevelColors {
+    pub warn: Option<u32>,
+    pub full: Option<u32>,
+}
+
+/// `LevelColors` for the light and the dark taskbar, which are themed separately.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct AlertColors {
+    pub light: LevelColors,
+    pub dark: LevelColors,
+}
+
 /// Same thresholds as the Mac app: orange at 20% left, red at 0%.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Level {

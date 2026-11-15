@@ -29,7 +29,7 @@ use windows::Win32::Graphics::Gdi::{
 use windows::core::{BOOL, PCWSTR, Result, w};
 use windows_numerics::Vector2;
 
-use crate::model::{Entry, Level, Provider, label};
+use crate::model::{Entry, Level, LevelColors, Provider, label};
 
 // ---- Colours ---------------------------------------------------------------------------
 
@@ -57,7 +57,19 @@ pub struct Palette {
 }
 
 impl Palette {
-    pub fn new(light: bool) -> Palette {
+    /// The built-in palette, with the theme's warn and full colors laid over it.
+    pub fn new(light: bool, colors: LevelColors) -> Palette {
+        let mut palette = Palette::built_in(light);
+        if let Some(warn) = colors.warn {
+            palette.warn = Rgba::hex(warn);
+        }
+        if let Some(full) = colors.full {
+            palette.full = Rgba::hex(full);
+        }
+        palette
+    }
+
+    fn built_in(light: bool) -> Palette {
         if light {
             Palette {
                 text: Rgba::hex(0x1a1a1a),
@@ -243,9 +255,17 @@ impl Painter {
 
     /// Renders the widget. `thickness` is the taskbar's size across the bar in pixels; the
     /// result is that tall and as wide as the content.
-    pub fn widget(&self, entries: &[Entry], dpi: u32, thickness: i32, light: bool, hovered: bool) -> Result<Frame> {
+    pub fn widget(
+        &self,
+        entries: &[Entry],
+        dpi: u32,
+        thickness: i32,
+        light: bool,
+        colors: LevelColors,
+        hovered: bool,
+    ) -> Result<Frame> {
         let scale = dpi as f32 / 96.0;
-        let palette = Palette::new(light);
+        let palette = Palette::new(light, colors);
         let parts = entries
             .iter()
             .map(|e| {
