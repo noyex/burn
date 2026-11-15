@@ -81,8 +81,9 @@ enum ThemeToken: String, CaseIterable, Sendable {
     case danger
     case menuBarWarn = "menubar-warn"
     case menuBarFull = "menubar-full"
+    case selection
 
-    /// Built-in value; nil means "the system color" (menu bar alerts).
+    /// Built-in value; nil means "the system color" (menu bar alerts, the selection ring).
     func standard(dark: Bool) -> RGBA? {
         func pick(_ light: UInt32, _ darkHex: UInt32) -> RGBA { RGBA(hex: dark ? darkHex : light) }
         switch self {
@@ -112,7 +113,7 @@ enum ThemeToken: String, CaseIterable, Sendable {
         case .warnOnDark: return RGBA(hex: 0xFFB340)
         case .fullOnDark: return RGBA(hex: 0xFF6B5E)
         case .danger: return pick(0xFF3B30, 0xFF453A)
-        case .menuBarWarn, .menuBarFull: return nil
+        case .menuBarWarn, .menuBarFull, .selection: return nil
         }
     }
 
@@ -123,17 +124,77 @@ enum ThemeToken: String, CaseIterable, Sendable {
     ]
 }
 
+/// What a theme draws on a block on top of its fill color: a gradient, an image, a pattern.
+struct BlockBackground: Equatable, Sendable {
+    /// A color written out, or another token's color so it follows light and dark.
+    enum Paint: Equatable, Sendable {
+        case color(RGBA)
+        case token(ThemeToken)
+
+        init?(_ string: String) {
+            if let color = RGBA(string) {
+                self = .color(color)
+            } else if let token = ThemeToken(rawValue: string), token.standard(dark: false) != nil {
+                // Tokens that default to a system color have nothing to paint with.
+                self = .token(token)
+            } else {
+                return nil
+            }
+        }
+    }
+
+    struct Gradient: Equatable, Sendable {
+        var colors: [Paint]
+        /// Degrees, as in CSS: 0 runs bottom to top, 90 left to right, 180 top to bottom.
+        var angle = 180.0
+    }
+
+    struct Pattern: Equatable, Sendable {
+        enum Kind: String, CaseIterable, Sendable { case dots, grid, lines }
+        enum Fade: String, CaseIterable, Sendable { case top, bottom }
+
+        var kind: Kind
+        var color: Paint
+        var opacity = 0.25
+        /// Distance between marks, and how thick each one is, in points.
+        var spacing = 8.0
+        var size = 1.5
+        /// Edge the pattern fades out toward.
+        var fade: Fade?
+    }
+
+    struct Image: Equatable, Sendable {
+        /// A file in the themes folder.
+        var file: String
+        var opacity = 1.0
+    }
+
+    var gradient: Gradient?
+    var image: Image?
+    var pattern: Pattern?
+
+    /// Blocks that can carry a background, with the ink a pattern defaults to.
+    static let slots: [ThemeToken: ThemeToken] = [
+        .accent: .accentInk, .coral: .coralInk, .mono: .monoInk, .lavender: .lavenderInk,
+        .sky: .skyInk, .neutral: .text, .surface: .text,
+    ]
+}
+
 /// A theme file laid over the built-in look. Whatever the file leaves out keeps its built-in
 /// value, so a theme written for an older Burn keeps working when new tokens appear.
 struct ResolvedTheme: Equatable, Sendable {
     static let radiusRange = 0.0...24.0
     static let gapRange = 2.0...12.0
+    static let pillRange = 0.0...999.0
 
     var name = "Default"
     private(set) var light: [ThemeToken: RGBA] = [:]
     private(set) var dark: [ThemeToken: RGBA] = [:]
     var radius = 14.0
     var gap = 6.0
+    /// Corner radius of buttons, pills and the tab switcher; the default is fully round.
+    var pill = 999.0
+    private(set) var backgrounds: [ThemeToken: BlockBackground] = [:]
     /// Font family for text and for the big numbers; nil keeps Bricolage Grotesque.
     var textFont: String?
     var displayFont: String?
@@ -144,9 +205,36 @@ struct ResolvedTheme: Equatable, Sendable {
         (isDark ? dark : light)[token] ?? token.standard(dark: isDark)
     }
 
+    /// Up to three colors that tell this theme from the others, most important first.
+    func swatch(dark isDark: Bool) -> [RGBA] {
+        func resolve(_ paint: BlockBackground.Paint) -> RGBA? {
+            switch paint {
+            case let .color(rgba): rgba
+            case let .token(token): color(token, dark: isDark)
+            }
+        }
+        var candidates: [RGBA?] = [color(.coral, dark: isDark), color(.accent, dark: isDark)]
+        // A theme whose blocks share one fill is told apart by what it draws on them.
+        for slot in [ThemeToken.coral, .accent] {
+            if let pattern = backgrounds[slot]?.pattern { candidates.append(resolve(pattern.color)) }
+            candidates += backgrounds[slot]?.gradient?.colors.map(resolve) ?? []
+        }
+        candidates += [ThemeToken.lavender, .sky, .mono, .text, .secondary].map { color($0, dark: isDark) }
+        var picked: [RGBA] = []
+        for case let candidate? in candidates where candidate.a > 0.5 && picked.count < 3 {
+            let distinct = picked.allSatisfy { other in
+                let d = [candidate.r - other.r, candidate.g - other.g, candidate.b - other.b]
+                return (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).squareRoot() > 0.12
+            }
+            if distinct { picked.append(candidate) }
+        }
+        return picked.isEmpty ? [RGBA(hex: 0x808080)] : picked
+    }
+
     /// Reads a theme file. Never fails: anything it can't use is skipped and reported in `issues`.
     static func parse(_ data: Data, name fallbackName: String,
-                      fontExists: (String) -> Bool = { _ in true }) -> (theme: ResolvedTheme, issues: [String]) {
+                      fontExists: (String) -> Bool = { _ in true },
+                      imageExists: (String) -> Bool = { _ in true }) -> (theme: ResolvedTheme, issues: [String]) {
         var theme = ResolvedTheme()
         theme.name = fallbackName
         var issues: [String] = []
@@ -160,7 +248,7 @@ struct ResolvedTheme: Equatable, Sendable {
             return (theme, ["Not valid JSON: \(error.localizedDescription)"])
         }
 
-        let known: Set = ["name", "colors", "light", "dark", "shape", "fonts"]
+        let known: Set = ["name", "colors", "light", "dark", "shape", "fonts", "backgrounds"]
         for key in root.keys.sorted() where !known.contains(key) { issues.append("Unknown key \"\(key)\".") }
         if let name = root["name"] as? String, !name.isEmpty { theme.name = name }
 
@@ -192,22 +280,38 @@ struct ResolvedTheme: Equatable, Sendable {
             if let fill = theme.dark[pair.fill], theme.dark[pair.ink] == nil { theme.dark[pair.ink] = fill.readableInk }
         }
 
+        /// A number from `object`, clamped to `range`; nil when missing or not a number.
+        func number(_ object: [String: Any], _ key: String, at path: String, in range: ClosedRange<Double>) -> Double? {
+            guard let value = object[key] else { return nil }
+            // JSON true and false bridge to numbers too; 0 and 1 must not be mistaken for them.
+            guard let boxed = value as? NSNumber, CFGetTypeID(boxed) != CFBooleanGetTypeID() else {
+                issues.append("\(path).\(key): must be a number.")
+                return nil
+            }
+            let number = boxed.doubleValue
+            if !range.contains(number) {
+                issues.append("\(path).\(key): \(Self.short(number)) is outside \(Self.short(range.lowerBound))–\(Self.short(range.upperBound)), clamped.")
+            }
+            return min(max(number, range.lowerBound), range.upperBound)
+        }
+        func unknownKeys(_ object: [String: Any], at path: String, known: Set<String>) {
+            for key in object.keys.sorted() where !known.contains(key) { issues.append("\(path).\(key): unknown key.") }
+        }
+        func paint(_ object: [String: Any], _ key: String, at path: String) -> BlockBackground.Paint? {
+            guard let value = object[key] else { return nil }
+            guard let string = value as? String, let paint = BlockBackground.Paint(string) else {
+                issues.append("\(path).\(key): use #RRGGBB, #RRGGBBAA or a token name.")
+                return nil
+            }
+            return paint
+        }
+
         if let raw = root["shape"] {
             if let shape = raw as? [String: Any] {
-                func number(_ key: String, in range: ClosedRange<Double>) -> Double? {
-                    guard let value = shape[key] else { return nil }
-                    guard let number = value as? Double, !(value is Bool) else {
-                        issues.append("shape.\(key): must be a number.")
-                        return nil
-                    }
-                    if !range.contains(number) {
-                        issues.append("shape.\(key): \(Self.short(number)) is outside \(Self.short(range.lowerBound))–\(Self.short(range.upperBound)), clamped.")
-                    }
-                    return min(max(number, range.lowerBound), range.upperBound)
-                }
-                for key in shape.keys.sorted() where key != "radius" && key != "gap" { issues.append("shape.\(key): unknown key.") }
-                theme.radius = number("radius", in: radiusRange) ?? theme.radius
-                theme.gap = number("gap", in: gapRange) ?? theme.gap
+                unknownKeys(shape, at: "shape", known: ["radius", "gap", "pill"])
+                theme.radius = number(shape, "radius", at: "shape", in: radiusRange) ?? theme.radius
+                theme.gap = number(shape, "gap", at: "shape", in: gapRange) ?? theme.gap
+                theme.pill = number(shape, "pill", at: "shape", in: pillRange) ?? theme.pill
             } else {
                 issues.append("\"shape\" must be an object.")
             }
@@ -234,10 +338,82 @@ struct ResolvedTheme: Equatable, Sendable {
                 issues.append("\"fonts\" must be an object.")
             }
         }
+
+        if let raw = root["backgrounds"] {
+            if let blocks = raw as? [String: Any] {
+                for key in blocks.keys.sorted() {
+                    let path = "backgrounds.\(key)"
+                    guard let slot = ThemeToken(rawValue: key), let ink = BlockBackground.slots[slot] else {
+                        issues.append("\(path): not a block. Use one of \(BlockBackground.slots.keys.map(\.rawValue).sorted().joined(separator: ", ")).")
+                        continue
+                    }
+                    guard let block = blocks[key] as? [String: Any] else {
+                        issues.append("\(path): must be an object.")
+                        continue
+                    }
+                    unknownKeys(block, at: path, known: ["gradient", "image", "pattern"])
+                    var background = BlockBackground()
+
+                    if let gradient = block["gradient"] as? [String: Any] {
+                        unknownKeys(gradient, at: "\(path).gradient", known: ["colors", "angle"])
+                        let colors = (gradient["colors"] as? [Any] ?? []).compactMap { ($0 as? String).flatMap(BlockBackground.Paint.init) }
+                        if colors.count >= 2, colors.count == (gradient["colors"] as? [Any])?.count {
+                            background.gradient = .init(colors: colors)
+                            if let angle = number(gradient, "angle", at: "\(path).gradient", in: -360...360) { background.gradient?.angle = angle }
+                        } else {
+                            issues.append("\(path).gradient.colors: needs two or more colors (#RRGGBB or token names).")
+                        }
+                    } else if block["gradient"] != nil {
+                        issues.append("\(path).gradient: must be an object.")
+                    }
+
+                    if let image = block["image"] as? [String: Any] {
+                        unknownKeys(image, at: "\(path).image", known: ["file", "opacity"])
+                        if let file = image["file"] as? String, !file.isEmpty, !file.contains("/"), !file.hasPrefix(".") {
+                            if imageExists(file) {
+                                background.image = .init(file: file)
+                                if let opacity = number(image, "opacity", at: "\(path).image", in: 0...1) { background.image?.opacity = opacity }
+                            } else {
+                                issues.append("\(path).image.file: \"\(file)\" isn't in the themes folder.")
+                            }
+                        } else {
+                            issues.append("\(path).image.file: must be the name of a file in the themes folder.")
+                        }
+                    } else if block["image"] != nil {
+                        issues.append("\(path).image: must be an object.")
+                    }
+
+                    if let pattern = block["pattern"] as? [String: Any] {
+                        let at = "\(path).pattern"
+                        unknownKeys(pattern, at: at, known: ["type", "color", "opacity", "spacing", "size", "fade"])
+                        if let kind = (pattern["type"] as? String).flatMap(BlockBackground.Pattern.Kind.init) {
+                            var result = BlockBackground.Pattern(kind: kind, color: paint(pattern, "color", at: at) ?? .token(ink))
+                            result.opacity = number(pattern, "opacity", at: at, in: 0...1) ?? result.opacity
+                            result.spacing = number(pattern, "spacing", at: at, in: 3...64) ?? result.spacing
+                            result.size = number(pattern, "size", at: at, in: 0.5...16) ?? result.size
+                            if let fade = pattern["fade"] {
+                                result.fade = (fade as? String).flatMap(BlockBackground.Pattern.Fade.init)
+                                if result.fade == nil { issues.append("\(at).fade: use \"top\" or \"bottom\".") }
+                            }
+                            background.pattern = result
+                        } else {
+                            issues.append("\(at).type: use \"dots\", \"grid\" or \"lines\".")
+                        }
+                    } else if block["pattern"] != nil {
+                        issues.append("\(path).pattern: must be an object.")
+                    }
+
+                    if background != BlockBackground() { theme.backgrounds[slot] = background }
+                }
+            } else {
+                issues.append("\"backgrounds\" must be an object.")
+            }
+        }
         return (theme, issues)
     }
 
     private static func short(_ value: Double) -> String {
-        value == value.rounded() ? String(Int(value)) : String(value)
+        // %g never traps, however large the number in the file is.
+        String(format: "%g", value)
     }
 }

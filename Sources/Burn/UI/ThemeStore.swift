@@ -1,5 +1,6 @@
 import AppKit
 import CoreServices
+import ImageIO
 import Observation
 import SwiftUI
 
@@ -23,6 +24,22 @@ final class ThemeStore {
         let id: String
         /// The theme's own `name`, or the file name.
         let title: String
+        /// Ships inside the app rather than living in the user's folder.
+        var builtIn = false
+        /// The parsed theme, for its preview in Settings.
+        var look = ResolvedTheme.standard
+    }
+
+    /// Ready-made themes inside the app. A file of the same name in the user's folder wins.
+    nonisolated static let builtInDirectory = Bundle.main.resourceURL?.appendingPathComponent("Themes", isDirectory: true)
+
+    /// The file a theme name stands for: the user's own, else the built-in one.
+    nonisolated static func file(for name: String) -> URL {
+        let own = directory.appendingPathComponent(name + ".json")
+        if !FileManager.default.fileExists(atPath: own.path),
+           let builtIn = builtInDirectory?.appendingPathComponent(name + ".json"),
+           FileManager.default.fileExists(atPath: builtIn.path) { return builtIn }
+        return own
     }
 
     private(set) var available: [Entry] = []
@@ -34,6 +51,10 @@ final class ThemeStore {
     /// The menu bar is drawn outside SwiftUI and has to be told.
     @ObservationIgnored var onChange: (() -> Void)?
     @ObservationIgnored private var stream: FSEventStreamRef?
+    /// Pictures by file name; nil for one that couldn't be read, so it isn't retried on every draw.
+    @ObservationIgnored private var images: [String: NSImage?] = [:]
+    /// Bumped when the pictures may have changed on disk, so blocks showing one redraw.
+    private var imageVersion = 0
 
     func start() {
         let fm = FileManager.default
@@ -48,6 +69,37 @@ final class ThemeStore {
         reload()
     }
 
+    /// A background picture from the themes folder.
+    func image(_ file: String) -> NSImage? {
+        _ = imageVersion
+        if let cached = images[file] { return cached }
+        let loaded = Self.picture(at: Self.directory.appendingPathComponent(file))
+        images.updateValue(loaded, forKey: file)
+        return loaded
+    }
+
+    /// Name of the theme in use, for Settings.
+    var selectedTitle: String {
+        guard let selected else { return "Default" }
+        return available.first { $0.id == selected }?.title ?? selected
+    }
+
+    /// Scaled down on load: a block is never wider than the panel, and the share card at 2x needs
+    /// 1200 px. Only plain files up to 25 MB, so a huge photo or a symlink to a device can't stall
+    /// the main thread.
+    private static func picture(at url: URL) -> NSImage? {
+        guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+              values.isRegularFile == true, let size = values.fileSize, size <= 25_000_000,
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 1400,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+    }
+
     func openFolder() {
         NSWorkspace.shared.open(Self.directory)
     }
@@ -58,32 +110,56 @@ final class ThemeStore {
             + "format, how to turn the theme on and how to check it. What I want: "
     }
 
-    static func loadFile(_ url: URL) -> (theme: ResolvedTheme, issues: [String])? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return ResolvedTheme.parse(data, name: url.deletingPathExtension().lastPathComponent, fontExists: fontExists)
+    /// For a user with no idea yet: the agent comes up with a few designs to pick from.
+    static var ideasPrompt: String {
+        "Design 4 themes for Burn, my menu bar app, each in a clearly different style. First read "
+            + "\"\(guideFile.path)\": it explains the format and how to check a theme. Write each one as a new "
+            + "file in the themes folder, never over an existing one. Use colors, block backgrounds, shape and "
+            + "fonts, and check every file. "
+            + "Then describe each theme in one line and turn on the one you like best. I'll try the rest in "
+            + "Burn → Settings → Theme."
     }
 
-    private static func fontExists(_ name: String) -> Bool {
-        NSFontManager.shared.availableFontFamilies.contains(name) || NSFont(name: name, size: 12) != nil
+    /// `families` saves asking AppKit for the font list once per file when loading many.
+    static func loadFile(_ url: URL, families: Set<String>? = nil) -> (theme: ResolvedTheme, issues: [String])? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        let families = families ?? Set(NSFontManager.shared.availableFontFamilies)
+        return ResolvedTheme.parse(data, name: url.deletingPathExtension().lastPathComponent,
+                                   fontExists: { families.contains($0) || NSFont(name: $0, size: 12) != nil },
+                                   imageExists: { FileManager.default.fileExists(atPath: url.deletingLastPathComponent().appendingPathComponent($0).path) })
     }
 
     private func reload() {
         let files = (try? FileManager.default.contentsOfDirectory(at: Self.directory, includingPropertiesForKeys: nil)) ?? []
-        let entries = files.filter { $0.pathExtension == "json" }
-            .map { url -> Entry in
-                let id = url.deletingPathExtension().lastPathComponent
-                return Entry(id: id, title: Self.loadFile(url)?.theme.name ?? id)
-            }
-            .sorted { $0.id.localizedStandardCompare($1.id) == .orderedAscending }
+        let families = Set(NSFontManager.shared.availableFontFamilies)
+        func list(_ urls: [URL], builtIn: Bool) -> [Entry] {
+            urls.filter { $0.pathExtension == "json" }
+                .map { url -> Entry in
+                    let id = url.deletingPathExtension().lastPathComponent
+                    let look = Self.loadFile(url, families: families)?.theme
+                    return Entry(id: id, title: look?.name ?? id, builtIn: builtIn, look: look ?? .standard)
+                }
+                .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        }
+        let own = list(files, builtIn: false)
+        let shipped = Self.builtInDirectory.flatMap { try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil) } ?? []
+        let entries = list(shipped, builtIn: true).filter { theme in
+            !own.contains { $0.id.caseInsensitiveCompare(theme.id) == .orderedSame }
+        } + own
         var name = (try? String(contentsOf: Self.activeFile, encoding: .utf8))?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if name?.hasSuffix(".json") == true { name = name.map { String($0.dropLast(5)) } }
-        if name == "" || name?.lowercased() == "default" { name = nil }
+        if name == "" { name = nil }
+        // The file system ignores case; show the name the way the file spells it.
+        if let match = entries.first(where: { $0.id.caseInsensitiveCompare(name ?? "") == .orderedSame }) { name = match.id }
 
         var next = ResolvedTheme.standard
         var problems: [String] = []
         if let name {
-            if let loaded = Self.loadFile(Self.directory.appendingPathComponent(name + ".json")) {
+            // A name, never a path out of the themes folder.
+            if name.contains("/") || name.hasPrefix(".") {
+                problems = ["active.txt must hold a theme's file name, not a path."]
+            } else if let loaded = Self.loadFile(Self.file(for: name), families: families) {
                 (next, problems) = loaded
             } else {
                 problems = ["Theme \"\(name)\" isn't in the themes folder."]
@@ -92,6 +168,11 @@ final class ThemeStore {
         if available != entries { available = entries }
         if selected != name { selected = name }
         if issues != problems { issues = problems }
+        // A picture can change under the same name.
+        if !images.isEmpty {
+            images = [:]
+            imageVersion += 1
+        }
         guard next != theme else { return }
         withAnimation(.easeOut(duration: 0.2)) { theme = next }
         onChange?()
@@ -130,7 +211,7 @@ func runCheckTheme(_ argument: String?) -> Int32 {
     }
     let url = argument.contains("/") || argument.hasSuffix(".json")
         ? URL(fileURLWithPath: argument)
-        : ThemeStore.directory.appendingPathComponent(argument + ".json")
+        : ThemeStore.file(for: argument)
     guard let (theme, issues) = ThemeStore.loadFile(url) else {
         print("Can't read \(url.path)")
         return 2

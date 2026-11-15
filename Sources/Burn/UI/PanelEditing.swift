@@ -142,8 +142,8 @@ private struct EditChrome: ViewModifier {
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(theme.text)
                             .frame(width: 20, height: 20)
-                            .floating(theme.surface, in: Circle())
-                            .contentShape(Circle())
+                            .floating(theme.surface, in: Bento.pill)
+                            .contentShape(Bento.pill)
                     }
                     .buttonStyle(PressStyle())
                     .offset(x: -6, y: -6)

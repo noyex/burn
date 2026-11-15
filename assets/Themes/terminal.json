@@ -1,0 +1,21 @@
+{
+  "name": "Terminal",
+  "colors": {
+    "base": "#020403", "surface": "#050A07", "neutral": "#08120C", "neutral-hover": "#0D1F14", "raised": "#123D22",
+    "text": "#4DFF88", "secondary": "#2E9955", "switcher": "#050A07", "switcher-ink": "#4DFF88",
+    "hairline": "#4DFF8855", "shadow": "#00FF6622",
+    "accent": "#4DFF88", "accent-ink": "#02140A",
+    "coral": "#050A07", "coral-ink": "#4DFF88", "mono": "#050A07", "mono-ink": "#4DFF88",
+    "lavender": "#050A07", "lavender-ink": "#4DFF88", "sky": "#050A07", "sky-ink": "#4DFF88",
+    "warn-on-light": "#7A4A00", "full-on-light": "#8A1010", "selection": "#4DFF88"
+  },
+  "shape": { "radius": 0, "pill": 0, "gap": 4 },
+  "fonts": { "text": "Menlo" },
+  "backgrounds": {
+    "coral": { "pattern": { "type": "grid", "color": "#4DFF88", "opacity": 0.12, "spacing": 12, "size": 0.5 } },
+    "mono": { "pattern": { "type": "grid", "color": "#4DFF88", "opacity": 0.12, "spacing": 12, "size": 0.5 } },
+    "lavender": { "pattern": { "type": "grid", "color": "#4DFF88", "opacity": 0.12, "spacing": 12, "size": 0.5 } },
+    "sky": { "pattern": { "type": "grid", "color": "#4DFF88", "opacity": 0.12, "spacing": 12, "size": 0.5 } },
+    "accent": { "pattern": { "type": "lines", "color": "#02140A", "opacity": 0.12, "spacing": 6, "size": 1 } }
+  }
+}

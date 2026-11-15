@@ -50,7 +50,7 @@ struct ProviderBlock: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: size == .s ? 0 : hero ? 96 : 92, alignment: .topLeading)
-        .block(theme.fill(color), padding: size == .s ? 10 : 12)
+        .block(color.tokens.fill, padding: size == .s ? 10 : 12)
         .accessibilityElement(children: .combine)
     }
 
@@ -208,7 +208,7 @@ struct ProviderBlock: View {
             .foregroundStyle(theme.alert(level, on: color))
             .padding(.horizontal, 6)
             .padding(.vertical, 1)
-            .background(ink, in: Capsule())
+            .background(ink, in: Bento.pill)
     }
 
     /// Same footprint as the loaded block, so nothing jumps when limits arrive.
@@ -217,12 +217,12 @@ struct ProviderBlock: View {
         if size == .s {
             VStack(alignment: .leading, spacing: 5) {
                 header(plan: nil, primary: nil) {
-                    Pulse { Capsule().fill(ink.opacity(0.22)).frame(width: 36, height: 16) }
+                    Pulse { Bento.pill.fill(ink.opacity(0.22)).frame(width: 36, height: 16) }
                 }
                 Pulse {
                     VStack(alignment: .leading, spacing: 6) {
-                        Capsule().fill(ink.opacity(0.16)).frame(maxWidth: .infinity).frame(height: 4)
-                        Capsule().fill(ink.opacity(0.16)).frame(width: 84, height: 9)
+                        Bento.pill.fill(ink.opacity(0.16)).frame(maxWidth: .infinity).frame(height: 4)
+                        Bento.pill.fill(ink.opacity(0.16)).frame(width: 84, height: 9)
                     }
                 }
             }
@@ -233,8 +233,8 @@ struct ProviderBlock: View {
                 Spacer(minLength: 10)
                 Pulse {
                     VStack(alignment: .leading, spacing: 6) {
-                        Capsule().fill(ink.opacity(0.22)).frame(width: hero ? 92 : 64, height: hero ? 40 : 30)
-                        Capsule().fill(ink.opacity(0.16)).frame(width: 84, height: 9)
+                        Bento.pill.fill(ink.opacity(0.22)).frame(width: hero ? 92 : 64, height: hero ? 40 : 30)
+                        Bento.pill.fill(ink.opacity(0.16)).frame(width: 84, height: 9)
                     }
                 }
             }
@@ -250,9 +250,9 @@ private struct RemainingBar: View {
 
     var body: some View {
         GeometryReader { geo in
-            Capsule().fill(ink.opacity(0.2))
+            Bento.pill.fill(ink.opacity(0.2))
                 .overlay(alignment: .leading) {
-                    Capsule().fill(ink).frame(width: geo.size.width * min(max(fraction, 0), 1))
+                    Bento.pill.fill(ink).frame(width: geo.size.width * min(max(fraction, 0), 1))
                 }
         }
         .frame(height: 4)
@@ -285,7 +285,7 @@ struct ProviderIssueRow: View {
             }
         }
         .frame(minHeight: 26)
-        .block(theme.neutral, padding: 10)
+        .block(.neutral, padding: 10)
     }
 }
 
@@ -336,7 +336,7 @@ struct SpendBlock: View {
             }
         }
         .foregroundStyle(theme.accentInk)
-        .block(theme.accent)
+        .block(.accent)
     }
 
     @ViewBuilder
@@ -376,8 +376,8 @@ struct SpendBlock: View {
     private var placeholder: some View {
         Pulse {
             VStack(alignment: .leading, spacing: 10) {
-                Capsule().fill(theme.accentInk.opacity(0.14)).frame(width: 120, height: 34)
-                Capsule().fill(theme.accentInk.opacity(0.1)).frame(maxWidth: .infinity).frame(height: 38)
+                Bento.pill.fill(theme.accentInk.opacity(0.14)).frame(width: 120, height: 34)
+                Bento.pill.fill(theme.accentInk.opacity(0.1)).frame(maxWidth: .infinity).frame(height: 38)
             }
         }
         .padding(.top, 10)
