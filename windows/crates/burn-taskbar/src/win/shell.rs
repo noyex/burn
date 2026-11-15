@@ -29,7 +29,7 @@ use super::clipboard::{self, ClipboardImage, ImageFile};
 use super::render::Painter;
 use super::taskbar::{Taskbar, dump_tree};
 use super::util::{hwnd_id, light_taskbar, log, to_rect, wide};
-use crate::layout::{Edge, Rect, widget_rect};
+use crate::layout::{Edge, Rect, widget_rect, work_clear_of_taskbar};
 use crate::model::Entry;
 
 const HOST_CLASS: PCWSTR = w!("BurnHost");
@@ -62,7 +62,7 @@ pub struct Anchor {
     pub rect: Rect,
     /// The screen edge the taskbar sits on; the panel opens away from it.
     pub edge: Edge,
-    /// Work area of the monitor (the screen minus the taskbar).
+    /// Work area of the monitor (the screen minus the taskbar, auto-hidden or not).
     pub work: Rect,
     pub dpi: u32,
 }
@@ -468,7 +468,11 @@ impl Shell {
                 log!("GetMonitorInfoW failed");
                 return None;
             }
-            to_rect(info.rcWork)
+            let work = to_rect(info.rcWork);
+            match taskbar {
+                Some(t) => work_clear_of_taskbar(work, to_rect(info.rcMonitor), t.rect, t.edge),
+                None => work,
+            }
         };
         Some(Anchor { rect, edge: taskbar.map_or(Edge::Bottom, |t| t.edge), work, dpi: taskbar.map_or(96, |t| t.dpi) })
     }

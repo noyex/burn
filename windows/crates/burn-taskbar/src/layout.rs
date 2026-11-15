@@ -84,6 +84,23 @@ fn overlaps(a: Rect, b: Rect) -> bool {
     a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
 }
 
+/// The work area with the taskbar's band kept free. An auto-hiding taskbar leaves the work
+/// area covering the whole monitor, so the panel would open over the bar once it slides in.
+/// `taskbar` is the bar's rect, shown or slid out; only its thickness is used.
+pub fn work_clear_of_taskbar(work: Rect, monitor: Rect, taskbar: Rect, edge: Edge) -> Rect {
+    if !overlaps(taskbar, monitor) {
+        return work;
+    }
+    let mut r = work;
+    match edge {
+        Edge::Bottom => r.bottom = r.bottom.min(monitor.bottom - taskbar.height()),
+        Edge::Top => r.top = r.top.max(monitor.top + taskbar.height()),
+        Edge::Left => r.left = r.left.max(monitor.left + taskbar.width()),
+        Edge::Right => r.right = r.right.min(monitor.right - taskbar.width()),
+    }
+    r
+}
+
 /// The panel's rect: against the taskbar side of the work area (opening away from the bar),
 /// centred on `anchor` along it and kept `gap` inside the work area.
 pub fn panel_rect(edge: Edge, anchor: Rect, work: Rect, size: (i32, i32), gap: i32) -> Rect {
@@ -144,6 +161,22 @@ mod tests {
         assert_eq!(panel_rect(Edge::Bottom, anchor, work, (360, 240), 12).right, 1908);
         let tall = panel_rect(Edge::Bottom, anchor, work, (360, 2000), 12);
         assert_eq!((tall.top, tall.bottom), (12, 1020));
+    }
+
+    #[test]
+    fn auto_hidden_taskbar_is_kept_clear() {
+        let monitor = Rect::new(0, 0, 1920, 1080);
+        // Auto-hide: the work area is the whole monitor, the bar slid out to 2 px.
+        let hidden = Rect::new(0, 1078, 1920, 1126);
+        assert_eq!(work_clear_of_taskbar(monitor, monitor, hidden, Edge::Bottom), Rect::new(0, 0, 1920, 1032));
+        // A docked bar is already outside the work area.
+        let work = Rect::new(0, 0, 1920, 1032);
+        assert_eq!(work_clear_of_taskbar(work, monitor, BOTTOM_BAR, Edge::Bottom), work);
+        // The bar is on another monitor.
+        let other = Rect::new(-1920, 1032, 0, 1080);
+        assert_eq!(work_clear_of_taskbar(monitor, monitor, other, Edge::Bottom), monitor);
+        let left = Rect::new(0, 0, 62, 1080);
+        assert_eq!(work_clear_of_taskbar(monitor, monitor, left, Edge::Left).left, 62);
     }
 
     #[test]

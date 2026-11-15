@@ -14,9 +14,13 @@ const CHECK_EVERY: Duration = Duration::from_secs(24 * 3600);
 const RETRY_AFTER: Duration = Duration::from_secs(30 * 60);
 const TICK: Duration = Duration::from_secs(10 * 60);
 
-/// Checks soon after launch and then once a day. Development builds never update.
+/// The version in Cargo.toml, which only the release workflow replaces with the real one.
+const UNRELEASED_VERSION: &str = "0.1.0";
+
+/// Checks soon after launch and then once a day. Development and CI builds never update: they
+/// aren't versioned, so every release would look newer.
 pub fn start(app: &AppHandle) {
-    if cfg!(debug_assertions) {
+    if cfg!(debug_assertions) || env!("CARGO_PKG_VERSION") == UNRELEASED_VERSION {
         return;
     }
     let app = app.clone();
