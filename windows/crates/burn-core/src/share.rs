@@ -1027,7 +1027,7 @@ mod tests {
 
     #[test]
     fn built_in_themes_render() {
-        for name in ["glow-dots", "terminal", "blueprint", "carbon", "paper", "sunset"] {
+        for name in ["aurora", "circuit", "ember", "frost", "glow-dots", "obsidian", "prism", "titanium"] {
             let theme = built_in(name);
             let png = render_png(&multi(), &theme, None, 1.0).unwrap_or_else(|e| panic!("{name}: {e}"));
             assert_ne!(
@@ -1049,8 +1049,8 @@ mod tests {
             ("multi", multi(), standard()),
             ("single", single(), standard()),
             ("glow-dots", multi(), built_in("glow-dots")),
-            ("terminal", multi(), built_in("terminal")),
-            ("terminal-single", single(), built_in("terminal")),
+            ("circuit", multi(), built_in("circuit")),
+            ("circuit-single", single(), built_in("circuit")),
             ("loud", multi(), loud_theme()),
         ];
         for (name, u, theme) in samples {

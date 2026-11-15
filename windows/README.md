@@ -49,7 +49,7 @@ cargo run -p burn-core --bin burn-cli -- import    # import and print totals (st
 parsers, regenerate it on a Mac with `scripts/update-usage-fixture.sh`.
 
 In a plain browser (`cd ui && npm run dev`) the panel shows demo data: `?demo=loading`,
-`?demo=signedOut`, `?demo=empty`, `?demo=importing`, `?demo=emptyShelf`. `?theme=terminal` turns
+`?demo=signedOut`, `?demo=empty`, `?demo=importing`, `?demo=emptyShelf`. `?theme=circuit` turns
 on a built-in theme and `#settings/theme` opens the theme page.
 
 `cargo clippy -p burn-taskbar --target x86_64-pc-windows-msvc` type-checks the widget from a Mac.

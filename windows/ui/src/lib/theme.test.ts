@@ -27,16 +27,13 @@ describe("theme", () => {
   it("has every built-in theme in the demo", () => {
     const all = demoTheme(null);
     expect(all.selected).toBeNull();
-    expect(all.available.map((t) => t.id)).toEqual([
-      "aurora", "blueprint", "carbon", "circuit", "ember", "frost", "glow-dots",
-      "obsidian", "paper", "prism", "sunset", "terminal", "titanium",
-    ]);
+    expect(all.available.map((t) => t.id)).toEqual(["aurora", "circuit", "ember", "frost", "glow-dots", "obsidian", "prism", "titanium"]);
     for (const t of all.available) {
       const picked = demoTheme(t.id);
       expect(picked.selected).toBe(t.id);
       expect(picked.title).toBe(t.title);
     }
-    expect(demoTheme("terminal").look.pill).toBe(0);
+    expect(demoTheme("circuit").look.pill).toBe(6);
     expect(demoTheme("no-such-theme").selected).toBeNull();
   });
 });
