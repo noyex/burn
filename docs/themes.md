@@ -13,6 +13,15 @@ your themes folder. Burn updates never touch that folder, so your themes stay as
 
 Burn watches the folder: save a file and the open panel changes within a second, no restart.
 
+## Built-in themes
+
+Burn ships with a few ready-made themes, listed in Settings → Theme above your own: `blueprint`,
+`carbon`, `glow-dots`, `paper`, `sunset` and `terminal`. Their names work in `active.txt` too.
+
+Their files are inside the app, in `/Applications/Burn.app/Contents/Resources/Themes/`, and an
+update replaces them. To change one, copy it into your themes folder and edit the copy: a file
+of yours with the same name wins over the built-in one. They are also good examples to start from.
+
 ## Make a theme
 
 1. Write `~/Library/Application Support/Burn/themes/midnight.json`:
@@ -175,5 +184,6 @@ When someone asks you to make or change a Burn theme:
 4. Write the theme name into `active.txt`.
 5. Run `/Applications/Burn.app/Contents/MacOS/Burn --check-theme <name>` and fix what it reports.
 6. Never edit files inside `Burn.app`: an update replaces them. Never edit this `README.md`.
+   To adjust a built-in theme, copy it into the themes folder first.
 
 To go back to the built-in look, empty `active.txt`.

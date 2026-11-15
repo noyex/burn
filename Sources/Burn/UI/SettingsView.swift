@@ -5,11 +5,12 @@ struct SettingsView: View {
     let onBack: () -> Void
     /// Closes settings and starts editing the panel.
     let onArrange: () -> Void
+    /// The theme page is open; the popover shows the panel next to it while it is.
+    @Binding var pickingTheme: Bool
     @State private var provider: ProviderID?
     @State private var draggedRow: ProviderID?
     @State private var dragStart = 0
     @State private var dragTranslation: CGFloat = 0
-    @State private var promptCopied = false
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -19,7 +20,12 @@ struct SettingsView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            if let provider {
+            if pickingTheme {
+                ThemeSettingsView {
+                    withAnimation(.snappy(duration: 0.25)) { pickingTheme = false }
+                }
+                .transition(pageTransition)
+            } else if let provider {
                 ProviderSettingsView(model: model, provider: provider) {
                     withAnimation(.snappy(duration: 0.25)) { self.provider = nil }
                 }
@@ -67,14 +73,20 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsSectionTitle("THEME")
-            SettingsGroup { themeRows }
-            if let issue = ThemeStore.shared.issues.first {
-                Text(issue)
-                    .font(.brand(11))
-                    .foregroundStyle(theme.danger)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 4)
+            SettingsGroup {
+                Button {
+                    withAnimation(.snappy(duration: 0.25)) { pickingTheme = true }
+                } label: {
+                    HStack {
+                        Text("Theme")
+                        Spacer()
+                        Text(ThemeStore.shared.selectedTitle).foregroundStyle(theme.secondary)
+                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(theme.secondary)
+                    }
+                    .frame(height: 32)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
 
             SettingsSectionTitle("SHELF")
@@ -162,62 +174,6 @@ struct SettingsView: View {
         Button(action: onArrange) {
             HStack {
                 Text("Arrange in panel…")
-                Spacer()
-                Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(theme.secondary)
-            }
-            .frame(height: 32)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private var themeRows: some View {
-        let store = ThemeStore.shared
-        HStack {
-            Text("Theme")
-            Spacer()
-            Picker("Theme", selection: Binding(get: { store.selected ?? "" },
-                                               set: { store.select($0.isEmpty ? nil : $0) })) {
-                Text("Default").tag("")
-                ForEach(store.available) { Text($0.title).tag($0.id) }
-                // Named in active.txt but missing: keep it visible instead of an empty picker.
-                if let selected = store.selected, !store.available.contains(where: { $0.id == selected }) {
-                    Text(selected).tag(selected)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .fixedSize()
-            .controlSize(.small)
-        }
-        .frame(height: 32)
-        Divider().opacity(0.6)
-        Button {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(ThemeStore.agentPrompt, forType: .string)
-            promptCopied = true
-            Task {
-                try? await Task.sleep(for: .seconds(1.5))
-                promptCopied = false
-            }
-        } label: {
-            HStack {
-                Text("Copy prompt for your agent")
-                Spacer()
-                Image(systemName: promptCopied ? "checkmark" : "doc.on.doc")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(theme.secondary)
-            }
-            .frame(height: 32)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .hoverTip("Paste it to Claude Code, Codex or Cursor and say what you want")
-        Divider().opacity(0.6)
-        Button { store.openFolder() } label: {
-            HStack {
-                Text("Open themes folder")
                 Spacer()
                 Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(theme.secondary)
             }
