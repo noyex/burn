@@ -1,0 +1,21 @@
+{
+  "name": "Paper",
+  "colors": {
+    "base": "#EFE9DC", "surface": "#FAF6EC", "neutral": "#F1EBDD", "neutral-hover": "#E7DFCD", "raised": "#FFFFFF",
+    "text": "#2B2620", "secondary": "#8A7F6E", "switcher": "#2B2620", "switcher-ink": "#FAF6EC",
+    "hairline": "#2B262033", "shadow": "#5A4A2A26",
+    "accent": "#F6E27A", "accent-ink": "#2B2620",
+    "coral": "#FAF6EC", "coral-ink": "#2B2620", "mono": "#2B2620", "mono-ink": "#FAF6EC",
+    "lavender": "#E4E9F7", "lavender-ink": "#1F2A4A", "sky": "#DDEEE3", "sky-ink": "#17382A",
+    "selection": "#C8452B"
+  },
+  "shape": { "radius": 6, "pill": 6, "gap": 7 },
+  "fonts": { "text": "Georgia" },
+  "backgrounds": {
+    "coral": { "pattern": { "type": "grid", "color": "#4A7BD0", "opacity": 0.22, "spacing": 14, "size": 0.5 } },
+    "mono": { "pattern": { "type": "lines", "color": "#FAF6EC", "opacity": 0.1, "spacing": 6, "size": 0.6 } },
+    "lavender": { "pattern": { "type": "dots", "opacity": 0.2, "spacing": 8, "size": 1.2 } },
+    "sky": { "pattern": { "type": "dots", "opacity": 0.2, "spacing": 8, "size": 1.2 } },
+    "accent": { "pattern": { "type": "lines", "opacity": 0.1, "spacing": 8, "size": 0.8 } }
+  }
+}

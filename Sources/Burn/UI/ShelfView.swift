@@ -28,10 +28,10 @@ struct ShelfView: View {
                     .font(.brand(12))
                     .opacity(0.6)
             }
-            .foregroundStyle(Theme.limeInk)
+            .foregroundStyle(Theme(scheme).accentInk)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 36)
-            .floating(Theme.lime, in: Bento.blockShape)
+            .floating(.accent, in: Bento.blockShape)
         } else {
             let rows = (shelf.items.count + columns - 1) / columns
             let contentHeight = CGFloat(rows) * (tileHeight + spacing) - spacing
@@ -103,7 +103,8 @@ private struct ShelfTile: View {
     @Environment(\.colorScheme) private var scheme
 
     private static let checkbox: CGFloat = 26
-    private let shape = Bento.blockShape
+    // Computed, so a live theme change reaches the corners.
+    private var shape: RoundedRectangle { Bento.blockShape }
 
     init(item: ShelfItem, size: CGSize, selected: Bool, selecting: Bool, actions: Actions) {
         self.item = item
@@ -123,14 +124,14 @@ private struct ShelfTile: View {
                     .scaledToFill()
                     .frame(width: size.width, height: size.height)
             } else {
-                Rectangle().fill(.quaternary)
+                Rectangle().fill(Theme(scheme).text.opacity(0.1))
             }
             if copied {
                 Label("Copied", systemImage: "checkmark")
                     .font(.system(size: 11, weight: .semibold))
                     .padding(.horizontal, 10)
                     .frame(height: 24)
-                    .glass(in: Capsule())
+                    .glass(in: Bento.pill)
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }
@@ -141,7 +142,7 @@ private struct ShelfTile: View {
         .allowsHitTesting(false)
         .floating(Theme(scheme).neutral, in: shape)
         .overlay {
-            shape.strokeBorder(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.white.opacity(0.12)),
+            shape.strokeBorder(selected ? Theme(scheme).selection : Theme.photoEdge,
                                lineWidth: selected ? 2.5 : 0.5)
         }
         .overlay(alignment: .topTrailing) {
@@ -166,14 +167,14 @@ private struct ShelfTile: View {
 
     private var checkmark: some View {
         ZStack {
-            Circle().fill(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.black.opacity(0.25)))
-            Circle().strokeBorder(.white.opacity(selected ? 0 : 0.9), lineWidth: 1.5)
+            Circle().fill(selected ? Theme(scheme).selection : Theme.photoScrim)
+            Circle().strokeBorder(Theme.onPhoto.opacity(selected ? 0 : 0.9), lineWidth: 1.5)
             if selected {
-                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.onPhoto)
             }
         }
         .frame(width: 16, height: 16)
-        .shadow(color: .black.opacity(0.3), radius: 2)
+        .shadow(color: Theme.photoShadow, radius: 2)
         .allowsHitTesting(false)
     }
 

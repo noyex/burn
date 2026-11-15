@@ -12,6 +12,7 @@ swift build
 scripts/build-app.sh --install   # builds Burn.app, copies it to /Applications and launches it
 .build/debug/Burn --dump         # print live limits and usage summaries
 .build/debug/Burn --preview      # popover content in a plain window, handy for screenshots
+swift test
 ```
 
 ## Pull requests
@@ -61,6 +62,7 @@ until the description has an image or video. If you only refactored UI code and 
 say so in the description and a maintainer will add the `no-ui` label.
 
 `.build/debug/Burn --preview` opens the popover in a plain window, which is the easiest way to capture it.
+Add `--dark` or `--light` to force an appearance `--settings` to open it on Settings and `--themes` on the theme page.
 
 ### Network and privacy
 
@@ -75,6 +77,13 @@ Burn reads tokens for Claude Code, Codex and Cursor, so changes that send data a
 
 Match the code around you: SwiftUI + AppKit, no third-party packages, small focused files.
 Comments explain why, not what.
+
+### Keep it themeable
+
+Users restyle Burn with their own [theme files](docs/themes.md), so views never hardcode a color,
+a block radius or a font. Read them from `Theme`, `Bento` and `Font.brand`, and add a token when
+none fits. The full rules are in [AGENTS.md](AGENTS.md); `scripts/check-theme-literals.sh` and
+`swift test` enforce them in CI.
 
 ## Releases
 

@@ -1,10 +1,19 @@
 import SwiftUI
 
 /// Shared building blocks of the bento look.
+@MainActor
 enum Bento {
-    static let blockRadius: CGFloat = 14
-    static let gap: CGFloat = 6
-    static let blockShape = RoundedRectangle(cornerRadius: blockRadius, style: .continuous)
+    static var blockRadius: CGFloat { ThemeStore.shared.theme.radius }
+    static var gap: CGFloat { ThemeStore.shared.theme.gap }
+    static var blockShape: RoundedRectangle { RoundedRectangle(cornerRadius: blockRadius, style: .continuous) }
+    /// Buttons, pills and the tab switcher: a capsule unless the theme squares them off.
+    static var pill: RoundedRectangle {
+        let radius = ThemeStore.shared.theme.pill
+        // Fully round has to match the capsule it replaces.
+        return RoundedRectangle(cornerRadius: radius, style: radius >= 100 ? .circular : .continuous)
+    }
+    /// Corners of small floating pieces: never rounder than the blocks.
+    static var smallShape: RoundedRectangle { RoundedRectangle(cornerRadius: min(blockRadius, 8), style: .continuous) }
     /// Room around the panel's content for the blocks' shadows.
     static let shadowInset = EdgeInsets(top: 6, leading: 14, bottom: 18, trailing: 14)
 }
@@ -17,9 +26,31 @@ extension View {
             .floating(fill, in: Bento.blockShape)
     }
 
+    /// A block filled with a theme token, carrying whatever background the theme gives that token.
+    func block(_ slot: ThemeToken, padding: CGFloat = 12) -> some View {
+        self.padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .floating(slot, in: Bento.blockShape)
+    }
+
     /// Fills `shape` and lifts it off the desktop with a soft shadow.
     func floating<S: InsettableShape>(_ fill: Color, in shape: S) -> some View {
-        modifier(Floating(fill: fill, shape: shape))
+        modifier(Floating(fill: fill, slot: nil, shape: shape))
+    }
+
+    func floating<S: InsettableShape>(_ slot: ThemeToken, in shape: S) -> some View {
+        modifier(Floating(fill: nil, slot: slot, shape: shape))
+    }
+
+    /// Fills `shape` with a theme token and the background the theme gives it, without lifting it.
+    func themedFill<S: InsettableShape>(_ slot: ThemeToken, in shape: S, theme: Theme) -> some View {
+        background {
+            shape.fill(theme.color(slot)).overlay {
+                if let background = theme.background(slot) {
+                    BlockDecoration(background: background, theme: theme).clipShape(shape)
+                }
+            }
+        }
     }
 
     /// Fades and lifts the view in when the popover opens, staggered by `index`.
@@ -29,14 +60,20 @@ extension View {
 }
 
 private struct Floating<S: InsettableShape>: ViewModifier {
-    let fill: Color
+    let fill: Color?
+    let slot: ThemeToken?
     let shape: S
     @Environment(\.colorScheme) private var scheme
 
     func body(content: Content) -> some View {
         let theme = Theme(scheme)
         content.background {
-            shape.fill(fill)
+            shape.fill(fill ?? slot.map(theme.color) ?? .clear)
+                .overlay {
+                    if let background = slot.flatMap(theme.background) {
+                        BlockDecoration(background: background, theme: theme).clipShape(shape)
+                    }
+                }
                 .overlay { shape.strokeBorder(theme.hairline, lineWidth: 0.5) }
                 .shadow(color: theme.shadow, radius: 10, y: 4)
         }
@@ -87,12 +124,12 @@ struct PillSegmented<Value: Hashable>: View {
                         .foregroundStyle(selected ? style.selectedText : style.text)
                         .padding(.horizontal, compact ? 8 : 0)
                         .frame(maxWidth: compact ? nil : .infinity, minHeight: compact ? 22 : 26)
-                        .contentShape(Capsule())
+                        .contentShape(Bento.pill)
                 }
                 .buttonStyle(.plain)
                 .background {
                     if selected {
-                        Capsule()
+                        Bento.pill
                             .fill(style.selected)
                             .matchedGeometryEffect(id: "selection", in: namespace)
                     }
@@ -101,13 +138,13 @@ struct PillSegmented<Value: Hashable>: View {
             }
         }
         .padding(2)
-        .background(style.track, in: Capsule())
+        .background(style.track, in: Bento.pill)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilityLabel)
     }
 }
 
-/// Dark capsule of icon tabs whose highlight slides between them.
+/// Capsule of icon tabs whose highlight slides between them.
 struct IconSwitcher: View {
     @Binding var selection: PopoverTab
 
@@ -124,16 +161,16 @@ struct IconSwitcher: View {
                 } label: {
                     Image(systemName: tab.symbol)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(selected ? 1 : 0.5))
+                        .foregroundStyle(theme.switcherInk.opacity(selected ? 1 : 0.5))
                         .frame(width: 40, height: 30)
                         .background {
                             if selected {
-                                Capsule()
-                                    .fill(.white.opacity(0.16))
+                                Bento.pill
+                                    .fill(theme.switcherInk.opacity(0.16))
                                     .matchedGeometryEffect(id: "selection", in: namespace)
                             }
                         }
-                        .contentShape(Capsule())
+                        .contentShape(Bento.pill)
                 }
                 .buttonStyle(PressStyle())
                 .hoverTip(tab.title)
@@ -142,7 +179,7 @@ struct IconSwitcher: View {
             }
         }
         .padding(3)
-        .floating(theme.switcher, in: Capsule())
+        .floating(theme.switcher, in: Bento.pill)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("View")
     }
@@ -169,12 +206,12 @@ struct RoundIconButton: View {
                 .frame(width: size, height: size)
                 .background {
                     if floating {
-                        Color.clear.floating(hovering ? theme.neutral : theme.surface, in: Circle())
+                        Color.clear.floating(hovering ? theme.neutral : theme.surface, in: Bento.pill)
                     } else {
-                        Circle().fill(hovering ? theme.neutralHover : theme.neutral)
+                        Bento.pill.fill(hovering ? theme.neutralHover : theme.neutral)
                     }
                 }
-                .contentShape(Circle())
+                .contentShape(Bento.pill)
         }
         .buttonStyle(PressStyle())
         .onHover { h in withAnimation(.easeOut(duration: 0.15)) { hovering = h } }
@@ -193,11 +230,11 @@ struct PillButtonStyle: ButtonStyle {
         let theme = Theme(scheme)
         configuration.label
             .font(.brand(12, prominent ? .bold : .medium))
-            .foregroundStyle(prominent ? theme.base : destructive ? .red : theme.text)
+            .foregroundStyle(prominent ? theme.base : destructive ? theme.danger : theme.text)
             .padding(.horizontal, 11)
             .frame(height: 26)
-            .background(prominent ? theme.text : theme.neutral, in: Capsule())
-            .contentShape(Capsule())
+            .background(prominent ? theme.text : theme.neutral, in: Bento.pill)
+            .contentShape(Bento.pill)
             .opacity(configuration.isPressed ? 0.75 : 1)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)

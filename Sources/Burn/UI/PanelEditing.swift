@@ -5,7 +5,7 @@ import SwiftUI
 /// a lone M take the full width. One flat layout, so cards slide when they change rows.
 struct CardGrid: Layout {
     let rows: [[ProviderID]]
-    var spacing = Bento.gap
+    let spacing: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.width ?? 304
@@ -142,8 +142,8 @@ private struct EditChrome: ViewModifier {
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(theme.text)
                             .frame(width: 20, height: 20)
-                            .floating(theme.surface, in: Circle())
-                            .contentShape(Circle())
+                            .floating(theme.surface, in: Bento.pill)
+                            .contentShape(Bento.pill)
                     }
                     .buttonStyle(PressStyle())
                     .offset(x: -6, y: -6)

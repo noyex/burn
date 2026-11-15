@@ -15,6 +15,9 @@ enum BurnMain {
             RunLoop.main.run()
             return
         }
+        if let flag = CommandLine.arguments.firstIndex(of: "--check-theme") {
+            exit(runCheckTheme(CommandLine.arguments.dropFirst(flag + 1).first))
+        }
         if CommandLine.arguments.contains("--verify-t3") {
             runVerifyT3()
             exit(0)
@@ -44,6 +47,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let model = AppModel()
+        ThemeStore.shared.onChange = { [weak model] in model?.settingsChanged() }
+        ThemeStore.shared.start()
         let preview = CommandLine.arguments.contains("--preview")
         if preview {
             previewWindow = Self.makePreviewWindow(model: model)

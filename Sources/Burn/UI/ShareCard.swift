@@ -2,12 +2,16 @@ import AppKit
 import SwiftUI
 
 /// A shareable image of the period's spend, drawn in the same bento style as the popover.
-/// Always light, so it looks the same wherever it's pasted.
+/// Always the light side of the theme, so it looks the same wherever it's pasted.
 struct ShareCard: View {
     let usage: UsageSummary
 
     static let size = CGSize(width: 600, height: 340)
     private let theme = Theme(.light)
+    /// The card is drawn larger than the panel, so its corners scale with the theme's.
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Bento.blockRadius * 20 / 14, style: .continuous)
+    }
 
     private var split: [(ProviderID, Double)] {
         ProviderID.allCases.compactMap { p in usage.byProvider[p].flatMap { $0 > 0 ? (p, $0) : nil } }
@@ -54,14 +58,14 @@ struct ShareCard: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
             Text("\(Format.tokens(usage.tokens)) tokens").font(.brand(13)).opacity(0.7)
-            SpendBars(usage: usage, ink: Theme.limeInk, animated: false)
+            SpendBars(usage: usage, ink: theme.accentInk, animated: false)
                 .frame(height: 52)
                 .padding(.top, 14)
         }
-        .foregroundStyle(Theme.limeInk)
+        .foregroundStyle(theme.accentInk)
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Theme.lime, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .themedFill(.accent, in: shape, theme: theme)
     }
 
     private func providerSpend(_ p: ProviderID, cost: Double) -> some View {
@@ -84,7 +88,7 @@ struct ShareCard: View {
         .foregroundStyle(ink)
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(theme.fill(p), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .themedFill(p.brandColor.tokens.fill, in: shape, theme: theme)
     }
 
     private var periodPhrase: String {

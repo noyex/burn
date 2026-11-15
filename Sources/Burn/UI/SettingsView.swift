@@ -5,6 +5,8 @@ struct SettingsView: View {
     let onBack: () -> Void
     /// Closes settings and starts editing the panel.
     let onArrange: () -> Void
+    /// The theme page is open; the popover shows the panel next to it while it is.
+    @Binding var pickingTheme: Bool
     @State private var provider: ProviderID?
     @State private var draggedRow: ProviderID?
     @State private var dragStart = 0
@@ -18,7 +20,12 @@ struct SettingsView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            if let provider {
+            if pickingTheme {
+                ThemeSettingsView {
+                    withAnimation(.snappy(duration: 0.25)) { pickingTheme = false }
+                }
+                .transition(pageTransition)
+            } else if let provider {
                 ProviderSettingsView(model: model, provider: provider) {
                     withAnimation(.snappy(duration: 0.25)) { self.provider = nil }
                 }
@@ -64,6 +71,22 @@ struct SettingsView: View {
                         menuBarRow(p)
                     }
                 }
+            }
+
+            SettingsGroup {
+                Button {
+                    withAnimation(.snappy(duration: 0.25)) { pickingTheme = true }
+                } label: {
+                    HStack {
+                        Text("Theme")
+                        Spacer()
+                        Text(ThemeStore.shared.selectedTitle).foregroundStyle(theme.secondary)
+                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(theme.secondary)
+                    }
+                    .frame(height: 32)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
 
             SettingsSectionTitle("SHELF")

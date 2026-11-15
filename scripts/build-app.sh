@@ -27,6 +27,9 @@ xcrun actool assets/AppIcon.icon --compile "$APP/Contents/Resources" --platform 
   --minimum-deployment-target 14.0 --app-icon AppIcon \
   --output-partial-info-plist "$(mktemp)" --output-format human-readable-text --errors --warnings
 cp -R assets/Fonts "$APP/Contents/Resources/Fonts"
+cp -R assets/Themes "$APP/Contents/Resources/Themes"
+# The theme guide Burn puts in the user's themes folder.
+cp docs/themes.md "$APP/Contents/Resources/themes.md"
 
 # 1.2.0 from the latest v1.2.0 tag; the build number is the commit count.
 VERSION="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo v0.0.0)"

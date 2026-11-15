@@ -192,8 +192,10 @@ enum MenuBarImage {
         let image = NSImage(size: NSSize(width: total, height: height), flipped: false) { _ in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
             var x: CGFloat = 0
+            // The menu bar follows the wallpaper, not the app's appearance.
+            let dark = NSAppearance.currentDrawing().bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             for (part, width) in zip(parts, widths) {
-                let color = part.level.color
+                let color = Theme.menuBar(part.level, dark: dark)
                 if let icon = part.icon {
                     let r = CGRect(x: x, y: (height - iconSize) / 2, width: iconSize, height: iconSize)
                     ctx.saveGState()
@@ -219,13 +221,6 @@ enum MenuBarImage {
             // From the rounded share left, so a block reading "0%" is always .full.
             let left = min(max(100 - percent, 0), 100).rounded()
             self = left <= 0 ? .full : left <= 100 - AppModel.warnPercent ? .warn : .normal
-        }
-        var color: NSColor {
-            switch self {
-            case .normal: .labelColor
-            case .warn: .systemOrange
-            case .full: .systemRed
-            }
         }
     }
 }

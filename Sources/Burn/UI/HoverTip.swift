@@ -82,7 +82,7 @@ private struct TipBubble: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .floating(theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .floating(theme.surface, in: Bento.smallShape)
     }
 }
 
