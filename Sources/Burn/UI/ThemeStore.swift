@@ -1,5 +1,6 @@
 import AppKit
 import CoreServices
+import ImageIO
 import Observation
 import SwiftUI
 
@@ -70,9 +71,25 @@ final class ThemeStore {
     func image(_ file: String) -> NSImage? {
         _ = imageVersion
         if let cached = images[file] { return cached }
-        let loaded = NSImage(contentsOf: Self.directory.appendingPathComponent(file))
+        let loaded = Self.picture(at: Self.directory.appendingPathComponent(file))
         images.updateValue(loaded, forKey: file)
         return loaded
+    }
+
+    /// Scaled down on load: a block is never wider than the panel, and the share card at 2x needs
+    /// 1200 px. Only plain files up to 25 MB, so a huge photo or a symlink to a device can't stall
+    /// the main thread.
+    private static func picture(at url: URL) -> NSImage? {
+        guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+              values.isRegularFile == true, let size = values.fileSize, size <= 25_000_000,
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 1400,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
     }
 
     func openFolder() {
