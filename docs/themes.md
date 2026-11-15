@@ -2,8 +2,14 @@
 
 A theme changes Burn's colors, block backgrounds, corners, spacing and fonts. Themes are plain JSON files in
 your themes folder. Burn updates never touch that folder, so your themes stay as you left them.
+A theme file works on macOS and Windows unchanged.
 
-**Themes folder (macOS):** `~/Library/Application Support/Burn/themes/`
+| | Themes folder |
+|---|---|
+| macOS | `~/Library/Application Support/Burn/themes/` |
+| Windows | `%LOCALAPPDATA%\Burn\themes\` |
+
+The same three files live in it on both systems:
 
 | File | What it is |
 |---|---|
@@ -18,13 +24,19 @@ Burn watches the folder: save a file and the open panel changes within a second,
 Burn ships with a few ready-made themes, listed in Settings → Theme above your own: `blueprint`,
 `carbon`, `glow-dots`, `paper`, `sunset` and `terminal`. Their names work in `active.txt` too.
 
-Their files are inside the app, in `/Applications/Burn.app/Contents/Resources/Themes/`, and an
-update replaces them. To change one, copy it into your themes folder and edit the copy: a file
+Their files sit next to the app and an update replaces them:
+
+| | Built-in theme files |
+|---|---|
+| macOS | `/Applications/Burn.app/Contents/Resources/Themes/` |
+| Windows | `%LOCALAPPDATA%\Burn\built-in-themes\` |
+
+To change one, copy it into your themes folder and edit the copy: a file
 of yours with the same name wins over the built-in one. They are also good examples to start from.
 
 ## Make a theme
 
-1. Write `~/Library/Application Support/Burn/themes/midnight.json`:
+1. Write `midnight.json` in your themes folder:
 
    ```json
    {
@@ -33,7 +45,7 @@ of yours with the same name wins over the built-in one. They are also good examp
      "light": { "base": "#F4F1FF" },
      "dark": { "base": "#0B0B10", "neutral": "#16161F" },
      "shape": { "radius": 18, "gap": 8 },
-     "fonts": { "text": "Avenir Next", "display": "Avenir Next" },
+     "fonts": { "text": ["Avenir Next", "Segoe UI"] },
      "backgrounds": {
        "accent": { "pattern": { "type": "dots", "spacing": 5, "fade": "top" } }
      }
@@ -43,14 +55,24 @@ of yours with the same name wins over the built-in one. They are also good examp
 2. Turn it on: write `midnight` into `active.txt`, or pick it in Burn → Settings → Theme.
 
    ```sh
-   echo midnight > ~/Library/Application\ Support/Burn/themes/active.txt
+   echo midnight > ~/Library/Application\ Support/Burn/themes/active.txt          # macOS
+   ```
+
+   ```powershell
+   Set-Content "$env:LOCALAPPDATA\Burn\themes\active.txt" midnight               # Windows
    ```
 
 3. Check it. This prints every value Burn skipped and why (exit code 0 means no problems):
 
    ```sh
-   /Applications/Burn.app/Contents/MacOS/Burn --check-theme midnight
+   /Applications/Burn.app/Contents/MacOS/Burn --check-theme midnight             # macOS
    ```
+
+   ```powershell
+   & "$env:LOCALAPPDATA\Burn\burn.exe" --check-theme midnight | Out-Host        # Windows
+   ```
+
+   The `| Out-Host` makes PowerShell wait for the result.
 
 Problems also show in red under Settings → Theme. A broken theme never breaks Burn: whatever
 can't be read falls back to the built-in value.
@@ -63,7 +85,7 @@ Burn version adds tokens.
 
 - `colors` applies to both light and dark appearance.
 - `light` and `dark` apply to one appearance and win over `colors`.
-- Burn follows the system appearance. Set a token in both `light` and `dark` (or once in
+- Burn follows the system appearance on both systems. Set a token in both `light` and `dark` (or once in
   `colors`) if it should look the same in both.
 
 ## Colors
@@ -99,9 +121,9 @@ transparent to `FF` solid). Named colors and `rgb()` are not supported.
 | `warn-on-dark` | `#FFB340` | `#FFB340` | "Almost out" text on a card whose ink is dark |
 | `full-on-dark` | `#FF6B5E` | `#FF6B5E` | "Limit reached" text on a card whose ink is dark |
 | `danger` | `#FF3B30` | `#FF453A` | Destructive buttons, theme problems |
-| `menubar-warn` | `system` | `system` | Menu bar percentage at 20% left. Default: system orange |
-| `menubar-full` | `system` | `system` | Menu bar percentage at 0% left. Default: system red |
-| `selection` | `system` | `system` | Ring and checkmark on selected shelf screenshots. Default: the system accent color |
+| `menubar-warn` | `system` | `system` | Menu bar (Windows: taskbar) percentage at 20% left. Default: system orange (Windows: Burn's orange) |
+| `menubar-full` | `system` | `system` | Menu bar (Windows: taskbar) percentage at 0% left. Default: system red (Windows: Burn's red) |
+| `selection` | `system` | `system` | Ring and checkmark on selected shelf screenshots. Default: the system accent color (Windows: the text color) |
 
 Good to know:
 
@@ -111,7 +133,8 @@ Good to know:
 - **Card colors are slots.** Each provider's card uses one of `coral`, `mono`, `lavender`, `sky`
   (chosen per provider in Settings). A theme recolors the slots; it can't add new ones.
 - **Menu bar tokens** follow the menu bar's own light or dark look, which depends on the
-  wallpaper, not on the system appearance. The normal percentage always uses the system text color.
+  wallpaper, not on the system appearance. On Windows they color the percentage in the taskbar
+  widget and follow the taskbar's light or dark mode. The normal percentage always uses the system text color.
 - The blocks float over the desktop, so there is no window background to set.
 
 ## Shape
@@ -147,7 +170,7 @@ cards), `neutral` (notices and empty states) and `surface` (the settings panel).
 |---|---|---|---|
 | `gradient.colors` | | 2 or more | Colors of a linear gradient |
 | `gradient.angle` | `180` | -360–360 | Direction in degrees, as in CSS: `0` bottom to top, `90` left to right, `180` top to bottom |
-| `image.file` | | | A picture in the themes folder (PNG, JPEG, HEIC…), scaled to fill the block |
+| `image.file` | | | A picture in the themes folder (PNG or JPEG on both systems), scaled to fill the block |
 | `image.opacity` | `1` | 0–1 | |
 | `pattern.type` | | `dots`, `grid`, `lines` | |
 | `pattern.color` | the block's ink | | |
@@ -167,8 +190,13 @@ block's `-ink` color must stay readable across the whole gradient or image.
 | `fonts.text` | Bricolage Grotesque | All text |
 | `fonts.display` | same as `fonts.text` | The big numbers |
 
-Use the family name of a font installed on this computer, as shown in Font Book (for example
-`"Avenir Next"`, `"SF Pro Rounded"`, `"JetBrains Mono"`). A font that isn't installed is skipped.
+Use the family name of a font installed on this computer, as shown in Font Book (macOS) or
+Settings → Personalization → Fonts (Windows), for example `"Avenir Next"` or `"JetBrains Mono"`.
+A font that isn't installed is skipped.
+
+Give a list to name one font per system. The first installed one wins:
+`"text": ["Menlo", "Cascadia Mono", "Consolas"]`. A single name still works.
+
 Burn uses the medium, bold and heavy weights, so pick a family that has them.
 
 ## For coding agents
@@ -176,14 +204,18 @@ Burn uses the medium, bold and heavy weights, so pick a family that has them.
 When someone asks you to make or change a Burn theme:
 
 1. Read the token table above. Use only these keys; unknown keys are reported and ignored.
-2. Write or edit one `<name>.json` in the themes folder. Lowercase file name, no spaces.
+2. Write or edit one `<name>.json` in the themes folder (macOS
+   `~/Library/Application Support/Burn/themes/`, Windows `%LOCALAPPDATA%\Burn\themes\`). Lowercase file name, no spaces.
    Background pictures go in the same folder and are named in `image.file`.
    Change only what the request needs and leave the rest out.
 3. Cover both appearances: put a color in `colors` if it works on light and dark, otherwise set
    it in `light` and `dark` separately. Keep text readable on its fill (aim for 4.5:1 contrast).
 4. Write the theme name into `active.txt`.
-5. Run `/Applications/Burn.app/Contents/MacOS/Burn --check-theme <name>` and fix what it reports.
-6. Never edit files inside `Burn.app`: an update replaces them. Never edit this `README.md`.
+5. Check it and fix what it reports. The files work on both systems, so name a font per system
+   if the theme sets one.
+   - macOS: `/Applications/Burn.app/Contents/MacOS/Burn --check-theme <name>`
+   - Windows: `& "$env:LOCALAPPDATA\Burn\burn.exe" --check-theme <name> | Out-Host`
+6. Never edit files inside `Burn.app` or `built-in-themes`: an update replaces them. Never edit this `README.md`.
    To adjust a built-in theme, copy it into the themes folder first.
 
 To go back to the built-in look, empty `active.txt`.

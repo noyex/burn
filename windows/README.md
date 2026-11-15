@@ -28,7 +28,9 @@ Burn reads provider credentials, read only, and never refreshes or prints tokens
 | Codex | `%USERPROFILE%\.codex\auth.json` |
 | Cursor | `%APPDATA%\Cursor\User\globalStorage\state.vscdb` |
 
-Its own files are in `%LOCALAPPDATA%\Burn`: `usage.sqlite`, `settings.json`, `Shelf\`, `burn.log`.
+Its own files are in `%LOCALAPPDATA%\Burn`: `usage.sqlite`, `settings.json`, `themes\`, `Shelf\`, `burn.log`.
+
+Themes are the same JSON files as on the Mac: see [docs/themes.md](../docs/themes.md).
 
 ## Develop
 
@@ -47,7 +49,8 @@ cargo run -p burn-core --bin burn-cli -- import    # import and print totals (st
 parsers, regenerate it on a Mac with `scripts/update-usage-fixture.sh`.
 
 In a plain browser (`cd ui && npm run dev`) the panel shows demo data: `?demo=loading`,
-`?demo=signedOut`, `?demo=empty`, `?demo=importing`, `?demo=emptyShelf`.
+`?demo=signedOut`, `?demo=empty`, `?demo=importing`, `?demo=emptyShelf`. `?theme=terminal` turns
+on a built-in theme and `#settings/theme` opens the theme page.
 
 `cargo clippy -p burn-taskbar --target x86_64-pc-windows-msvc` type-checks the widget from a Mac.
 The rest bundles SQLite (C) and needs the Windows SDK: the **Windows** workflow lints, tests and

@@ -2,10 +2,10 @@ name: Windows
 
 on:
   pull_request:
-    paths: ["windows/**", ".github/workflows/windows.yml"]
+    paths: ["windows/**", "assets/Themes/**", "assets/Fonts/**", "docs/themes.md", ".github/workflows/windows.yml"]
   push:
     branches: [main]
-    paths: ["windows/**", ".github/workflows/windows.yml"]
+    paths: ["windows/**", "assets/Themes/**", "assets/Fonts/**", "docs/themes.md", ".github/workflows/windows.yml"]
   workflow_dispatch:
 
 permissions:
