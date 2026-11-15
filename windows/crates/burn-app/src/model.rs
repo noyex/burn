@@ -2,7 +2,7 @@
 //! as one `Snapshot` on every change; the taskbar widget gets its entries.
 
 use burn_core::database::UsageDatabase;
-use burn_core::settings::{Settings, pick_window};
+use burn_core::settings::{Settings, pick_windows};
 use burn_core::shelf::{Shelf, ShelfItem};
 use burn_core::{LimitsError, Paths, Period, ProviderId, ProviderLimits, UsageSummary, importer, limits};
 use serde::Serialize;
@@ -79,6 +79,8 @@ pub struct WidgetEntry {
     pub provider: ProviderId,
     pub used: f64,
     pub resets_at: Option<i64>,
+    /// False for a provider's second and later windows, drawn after the first without a logo.
+    pub logo: bool,
 }
 
 struct State {
@@ -315,10 +317,17 @@ impl Model {
         snap.connected
             .iter()
             .filter(|p| snap.settings.shows_in_widget(**p))
-            .filter_map(|p| {
-                let limits = snap.limits.get(p)?.limits()?;
-                let w = pick_window(snap.settings.widget_window(*p), limits)?;
-                Some(WidgetEntry { provider: *p, used: w.percent, resets_at: w.resets_at })
+            .flat_map(|p| {
+                let Some(limits) = snap.limits.get(p).and_then(|l| l.limits()) else {
+                    return Vec::new();
+                };
+                let choices = snap.settings.widget_window_list(*p);
+                let shown = pick_windows(&choices, limits);
+                shown
+                    .iter()
+                    .enumerate()
+                    .map(|(i, w)| WidgetEntry { provider: *p, used: w.percent, resets_at: w.resets_at, logo: i == 0 })
+                    .collect()
             })
             .collect()
     }

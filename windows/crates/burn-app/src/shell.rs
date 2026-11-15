@@ -77,6 +77,7 @@ fn to_entries(entries: &[WidgetEntry]) -> Vec<Entry> {
                 ProviderId::Cursor => Provider::Cursor,
             },
             used: e.used,
+            logo: e.logo,
             resets_in: e.resets_at.map(|t| ((t - now).max(0) / 1000) as u64),
         })
         .collect()

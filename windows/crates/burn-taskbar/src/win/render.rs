@@ -180,6 +180,8 @@ const TEXT_SIZE: f32 = 12.5;
 const ICON: f32 = 14.0;
 const ICON_GAP: f32 = 5.0;
 const ENTRY_GAP: f32 = 12.0;
+/// Between a provider's windows, e.g. "97% / 53%". A slash, since "·" already sets off the reset time.
+const SUB_GAP: f32 = 4.0;
 const PAD_X: f32 = 8.0;
 const HOVER_HEIGHT: f32 = 40.0;
 
@@ -249,14 +251,26 @@ impl Painter {
         let parts = entries
             .iter()
             .map(|e| {
-                let layout = self.layout(&label(e), TEXT_SIZE, DWRITE_FONT_WEIGHT_MEDIUM, true)?;
+                let text = if e.logo { label(e) } else { format!("/ {}", label(e)) };
+                let layout = self.layout(&text, TEXT_SIZE, DWRITE_FONT_WEIGHT_MEDIUM, true)?;
                 let m = metrics(&layout)?;
                 Ok((e, layout, m))
             })
             .collect::<Result<Vec<_>>>()?;
-        let content: f32 =
-            parts.iter().map(|(_, _, m)| ICON + ICON_GAP + m.widthIncludingTrailingWhitespace.ceil()).sum::<f32>()
-                + ENTRY_GAP * parts.len().saturating_sub(1) as f32;
+        let content: f32 = parts
+            .iter()
+            .enumerate()
+            .map(|(i, (e, _, m))| {
+                let gap = if i == 0 {
+                    0.0
+                } else if e.logo {
+                    ENTRY_GAP
+                } else {
+                    SUB_GAP
+                };
+                gap + if e.logo { ICON + ICON_GAP } else { 0.0 } + m.widthIncludingTrailingWhitespace.ceil()
+            })
+            .sum();
         let width = ((content + 2.0 * PAD_X) * scale).ceil() as i32;
         let height = thickness.max(1);
         let height_dip = height as f32 / scale;
@@ -278,14 +292,19 @@ impl Painter {
                 rt.FillRoundedRectangle(&D2D1_ROUNDED_RECT { rect, radiusX: 4.0, radiusY: 4.0 }, &brush);
             }
             let mut x = PAD_X;
-            for (entry, layout, m) in &parts {
+            for (i, (entry, layout, m)) in parts.iter().enumerate() {
+                if i > 0 {
+                    x += if entry.logo { ENTRY_GAP } else { SUB_GAP };
+                }
                 let color = palette.level(Level::from_used(entry.used));
-                draw_logo(&rt, entry.provider, color, x, (height_dip - ICON) / 2.0, ICON, scale);
-                x += ICON + ICON_GAP;
+                if entry.logo {
+                    draw_logo(&rt, entry.provider, color, x, (height_dip - ICON) / 2.0, ICON, scale);
+                    x += ICON + ICON_GAP;
+                }
                 let brush = rt.CreateSolidColorBrush(&color.d2d(), None)?;
                 let y = ((height_dip - m.height) / 2.0 * scale).round() / scale;
                 rt.DrawTextLayout(Vector2 { X: x, Y: y }, layout, &brush, D2D1_DRAW_TEXT_OPTIONS_NONE);
-                x += m.widthIncludingTrailingWhitespace.ceil() + ENTRY_GAP;
+                x += m.widthIncludingTrailingWhitespace.ceil();
             }
             rt.EndDraw(None, None)?;
         }
