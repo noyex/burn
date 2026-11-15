@@ -88,8 +88,9 @@ final class ThemeStore {
     /// For a user with no idea yet: the agent comes up with a few designs to pick from.
     static var ideasPrompt: String {
         "Design 4 themes for Burn, my menu bar app, each in a clearly different style. First read "
-            + "\"\(guideFile.path)\": it explains the format and how to check a theme. Write each one as its own "
-            + "file in the themes folder, use colors, block backgrounds, shape and fonts, and check every file. "
+            + "\"\(guideFile.path)\": it explains the format and how to check a theme. Write each one as a new "
+            + "file in the themes folder, never over an existing one. Use colors, block backgrounds, shape and "
+            + "fonts, and check every file. "
             + "Then describe each theme in one line and turn on the one you like best. I'll try the rest in "
             + "Burn → Settings → Theme."
     }
