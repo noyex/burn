@@ -10,7 +10,7 @@
     "selection": "#FF7A59"
   },
   "shape": { "radius": 24, "gap": 8 },
-  "fonts": { "text": "Avenir Next" },
+  "fonts": { "text": ["Avenir Next", "Segoe UI"] },
   "backgrounds": {
     "coral": { "gradient": { "colors": ["#FF5C8A", "#FF8A4C"], "angle": 120 } },
     "mono": { "gradient": { "colors": ["#7C5CFF", "#B24BF3"], "angle": 135 } },
