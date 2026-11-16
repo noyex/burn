@@ -28,7 +28,7 @@
         class:fade-top={art.pattern.fade === "top"}
         class:fade-bottom={art.pattern.fade === "bottom"}
         style:opacity={art.pattern.opacity}
-        use:animatedPattern={{ pattern: art.pattern, level }}
+        use:animatedPattern={{ pattern: art.pattern, level, slot: fill }}
       ></canvas>
     {:else if art.pattern && pattern}
       <div
