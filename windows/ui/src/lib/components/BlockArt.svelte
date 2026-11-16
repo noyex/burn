@@ -3,21 +3,34 @@
   image, then a pattern. First child of a `.block`; renders nothing in the built-in look.
 -->
 <script lang="ts">
+  import { animatedPattern, isAnimatedPattern } from "../patternCanvas";
   import { gradientCss, imageCss, patternCss, theme } from "../theme.svelte";
 
-  /** Token of the block's fill: `accent`, `neutral`, `surface` or a card color. */
-  let { fill }: { fill: string } = $props();
+  /**
+   * `fill` is the token of the block's fill: `accent`, `neutral`, `surface` or a card color.
+   * `level` (0..1) is how full the `level` pattern gets: what's left of the block's limit.
+   */
+  let { fill, level = 0.5 }: { fill: string; level?: number } = $props();
 
   const art = $derived(theme.backgrounds[fill]);
   const image = $derived(art?.image ? imageCss(art.image) : null);
-  const pattern = $derived(art?.pattern ? patternCss(art.pattern) : null);
+  const animated = $derived(isAnimatedPattern(art?.pattern));
+  const pattern = $derived(art?.pattern && !animated ? patternCss(art.pattern) : null);
 </script>
 
 {#if art}
   <div class="art" aria-hidden="true">
     {#if art.gradient}<div class="layer" style:background-image={gradientCss(art.gradient)}></div>{/if}
     {#if art.image && image}<div class="layer picture" style:background-image={image} style:opacity={art.image.opacity}></div>{/if}
-    {#if art.pattern && pattern}
+    {#if art.pattern && animated}
+      <canvas
+        class="layer"
+        class:fade-top={art.pattern.fade === "top"}
+        class:fade-bottom={art.pattern.fade === "bottom"}
+        style:opacity={art.pattern.opacity}
+        use:animatedPattern={{ pattern: art.pattern, level }}
+      ></canvas>
+    {:else if art.pattern && pattern}
       <div
         class="layer"
         class:fade-top={art.pattern.fade === "top"}
@@ -51,6 +64,10 @@
   .layer {
     position: absolute;
     inset: 0;
+  }
+  canvas.layer {
+    width: 100%;
+    height: 100%;
   }
   .picture {
     background-position: center;

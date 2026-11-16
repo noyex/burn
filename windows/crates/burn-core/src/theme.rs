@@ -270,16 +270,35 @@ pub enum PatternKind {
     Dots,
     Grid,
     Lines,
+    /// Animated: rows of dots rolling like a wave seen from above.
+    Wave,
+    /// Animated: the block filled up to what's left of its limit, with a moving surface.
+    Level,
+    /// Animated: a dot grid whose dots swell and shrink in drifting patches.
+    Halftone,
+    /// Animated: drops of dots falling down columns, leaving a fading trail.
+    Rain,
 }
 
 impl PatternKind {
+    /// Every kind, in the order the "unknown type" message lists them.
+    const ALL: [PatternKind; 7] = [
+        PatternKind::Dots,
+        PatternKind::Grid,
+        PatternKind::Lines,
+        PatternKind::Wave,
+        PatternKind::Level,
+        PatternKind::Halftone,
+        PatternKind::Rain,
+    ];
+
+    /// Kinds that move while the panel is open.
+    pub fn is_animated(self) -> bool {
+        matches!(self, PatternKind::Wave | PatternKind::Level | PatternKind::Halftone | PatternKind::Rain)
+    }
+
     fn from_key(key: &str) -> Option<PatternKind> {
-        match key {
-            "dots" => Some(PatternKind::Dots),
-            "grid" => Some(PatternKind::Grid),
-            "lines" => Some(PatternKind::Lines),
-            _ => None,
-        }
+        PatternKind::ALL.into_iter().find(|kind| kind.key() == key)
     }
 
     fn key(self) -> &'static str {
@@ -287,6 +306,10 @@ impl PatternKind {
             PatternKind::Dots => "dots",
             PatternKind::Grid => "grid",
             PatternKind::Lines => "lines",
+            PatternKind::Wave => "wave",
+            PatternKind::Level => "level",
+            PatternKind::Halftone => "halftone",
+            PatternKind::Rain => "rain",
         }
     }
 }
@@ -319,6 +342,8 @@ impl Fade {
 pub struct Pattern {
     pub kind: PatternKind,
     pub color: Paint,
+    /// Wave crests, the level's surface and the heads of rain drops; `None` uses `color`.
+    pub highlight: Option<Paint>,
     pub opacity: f64,
     /// Distance between marks, and how thick each one is, in points.
     pub spacing: f64,
@@ -328,7 +353,7 @@ pub struct Pattern {
 
 impl Pattern {
     pub fn new(kind: PatternKind, color: Paint) -> Pattern {
-        Pattern { kind, color, opacity: 0.25, spacing: 8.0, size: 1.5, fade: None }
+        Pattern { kind, color, highlight: None, opacity: 0.25, spacing: 8.0, size: 1.5, fade: None }
     }
 }
 
@@ -707,13 +732,16 @@ impl Parser {
             return None;
         };
         let at = format!("{path}.pattern");
-        self.unknown_keys(pattern, &at, &["type", "color", "opacity", "spacing", "size", "fade"]);
+        self.unknown_keys(pattern, &at, &["type", "color", "highlight", "opacity", "spacing", "size", "fade"]);
         let Some(kind) = pattern.get("type").and_then(Value::as_str).and_then(PatternKind::from_key) else {
-            self.issues.push(format!("{at}.type: use \"dots\", \"grid\" or \"lines\"."));
+            let kinds: Vec<String> = PatternKind::ALL.iter().map(|k| format!("\"{}\"", k.key())).collect();
+            let (last, rest) = kinds.split_last().expect("kinds is not empty");
+            self.issues.push(format!("{at}.type: use {} or {last}.", rest.join(", ")));
             return None;
         };
         let color = self.paint(pattern, "color", &at).unwrap_or(Paint::Token(ink));
         let mut result = Pattern::new(kind, color);
+        result.highlight = self.paint(pattern, "highlight", &at);
         result.opacity = self.number(pattern, "opacity", &at, (0.0, 1.0)).unwrap_or(result.opacity);
         result.spacing = self.number(pattern, "spacing", &at, (3.0, 64.0)).unwrap_or(result.spacing);
         result.size = self.number(pattern, "size", &at, (0.5, 16.0)).unwrap_or(result.size);
@@ -1071,6 +1099,8 @@ pub struct PatternState {
     #[serde(rename = "type")]
     pub kind: String,
     pub color: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub highlight: Option<String>,
     pub opacity: f64,
     pub spacing: f64,
     pub size: f64,
@@ -1159,6 +1189,7 @@ impl Loaded {
                     pattern: background.pattern.as_ref().map(|p| PatternState {
                         kind: p.kind.key().into(),
                         color: paint_css(&p.color),
+                        highlight: p.highlight.as_ref().map(paint_css),
                         opacity: p.opacity,
                         spacing: p.spacing,
                         size: p.size,
@@ -1346,6 +1377,30 @@ mod tests {
     }
 
     #[test]
+    fn parses_animated_patterns() {
+        let (theme, issues) = parse(
+            r##"{"backgrounds": {
+                 "coral": {"pattern": {"type": "wave", "color": "#FFFFFF", "highlight": "#FF6A3D", "spacing": 7}},
+                 "mono": {"pattern": {"type": "level", "highlight": "text"}},
+                 "sky": {"pattern": {"type": "rain", "highlight": "#nope"}}}}"##,
+        );
+        assert_eq!(issues, ["backgrounds.sky.pattern.highlight: use #RRGGBB, #RRGGBBAA or a token name."]);
+        let wave = theme.backgrounds[&Token::Coral].pattern.clone().unwrap();
+        let mut expected = Pattern::new(PatternKind::Wave, Paint::Color(hex(0xFFFFFF)));
+        expected.highlight = Some(Paint::Color(hex(0xFF6A3D)));
+        expected.spacing = 7.0;
+        assert_eq!(wave, expected);
+        assert!(wave.kind.is_animated());
+        assert_eq!(theme.backgrounds[&Token::Mono].pattern.as_ref().unwrap().highlight, Some(Paint::Token(Token::Text)));
+        // A bad highlight drops only the highlight, the rain still falls in the block's ink.
+        assert_eq!(
+            theme.backgrounds[&Token::Sky].pattern,
+            Some(Pattern::new(PatternKind::Rain, Paint::Token(Token::SkyInk)))
+        );
+        assert!(!PatternKind::Dots.is_animated());
+    }
+
+    #[test]
     fn skips_backgrounds_it_cannot_draw() {
         let (theme, issues) = parse_with(
             r##"{"backgrounds": {
@@ -1361,7 +1416,7 @@ mod tests {
             [
                 "backgrounds.accent.gradient.colors: needs two or more colors (#RRGGBB or token names).",
                 "backgrounds.accent.image.file: must be the name of a file in the themes folder.",
-                "backgrounds.accent.pattern.type: use \"dots\", \"grid\" or \"lines\".",
+                "backgrounds.accent.pattern.type: use \"dots\", \"grid\", \"lines\", \"wave\", \"level\", \"halftone\" or \"rain\".",
                 "backgrounds.coral.image.file: \"missing.png\" isn't in the themes folder.",
                 "backgrounds.text: not a block. Use one of accent, coral, lavender, mono, neutral, sky, surface.",
             ]

@@ -475,7 +475,8 @@ fn pattern_path(kind: PatternKind, step: f64, mark: f64, w: f64, h: f64) -> Stri
     };
     let mut d = String::new();
     match kind {
-        PatternKind::Dots => {
+        // The share image is a still: animated kinds show their dot field at rest.
+        PatternKind::Dots | PatternKind::Wave | PatternKind::Level | PatternKind::Halftone | PatternKind::Rain => {
             let (r, diameter) = ((mark / 2.0) as f32, mark as f32);
             for x in marks(step / 2.0, w) {
                 for y in marks(step / 2.0, h) {
@@ -521,8 +522,10 @@ fn pattern_svg(out: &mut String, id: u32, pattern: &Pattern, color: Rgba, b: &Re
     };
     let d = pattern_path(pattern.kind, pattern.spacing, pattern.size, f64::from(b.w), f64::from(b.h));
     let paint = match pattern.kind {
-        PatternKind::Dots => format!(r#"fill="{}""#, rgb(color)),
-        _ => format!(r#"fill="none" stroke="{}" stroke-width="{}""#, rgb(color), pattern.size as f32),
+        PatternKind::Grid | PatternKind::Lines => {
+            format!(r#"fill="none" stroke="{}" stroke-width="{}""#, rgb(color), pattern.size as f32)
+        }
+        _ => format!(r#"fill="{}""#, rgb(color)),
     };
     let _ = write!(
         out,

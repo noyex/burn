@@ -93,7 +93,16 @@ export interface ThemeBackground {
   gradient?: { colors: ThemePaint[]; angle: number };
   /** `version` changes when the file does, so the picture reloads. */
   image?: { path: string; opacity: number; version: number };
-  pattern?: { type: "dots" | "grid" | "lines"; color: ThemePaint; opacity: number; spacing: number; size: number; fade: "top" | "bottom" | null };
+  pattern?: {
+    type: "dots" | "grid" | "lines" | "wave" | "level" | "halftone" | "rain";
+    color: ThemePaint;
+    /** Wave crests, the level surface, rain heads; absent means `color`. */
+    highlight?: ThemePaint;
+    opacity: number;
+    spacing: number;
+    size: number;
+    fade: "top" | "bottom" | null;
+  };
 }
 
 /** The active theme: only what it changes, laid over the defaults in `theme.css`. */
