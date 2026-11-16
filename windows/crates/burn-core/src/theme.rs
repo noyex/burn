@@ -1391,7 +1391,10 @@ mod tests {
         expected.spacing = 7.0;
         assert_eq!(wave, expected);
         assert!(wave.kind.is_animated());
-        assert_eq!(theme.backgrounds[&Token::Mono].pattern.as_ref().unwrap().highlight, Some(Paint::Token(Token::Text)));
+        assert_eq!(
+            theme.backgrounds[&Token::Mono].pattern.as_ref().unwrap().highlight,
+            Some(Paint::Token(Token::Text))
+        );
         // A bad highlight drops only the highlight, the rain still falls in the block's ink.
         assert_eq!(
             theme.backgrounds[&Token::Sky].pattern,
