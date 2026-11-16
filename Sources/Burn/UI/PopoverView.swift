@@ -103,6 +103,19 @@ struct PopoverView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // Animated theme patterns stand still while the panel is closed.
         .environment(\.patternsMoving, visible)
+        .onChange(of: visible) { _, visible in
+            // The panel opens on the usage page again, never in settings or the theme picker,
+            // and with no half-made shelf selection, like the Windows panel.
+            guard !visible else { return }
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) {
+                showingSettings = false
+                pickingTheme = false
+                selection = []
+                confirmingClear = false
+            }
+        }
     }
 
     private var main: some View {
