@@ -1,44 +1,109 @@
-//! Self-update from GitHub releases, like the Mac app's Updater: checks once a day, offers the
-//! newer version in the footer, and on request installs it with the per-user NSIS installer
-//! (signature checked by the updater plugin), which restarts Burn.
+//! Self-update from GitHub releases, like the Mac app's Updater: checks every few hours and
+//! whenever the panel opens after a while, offers the newer version in the footer, and on request
+//! installs it with the per-user NSIS installer (signature checked by the updater plugin), which
+//! restarts Burn.
 
 use crate::model::Model;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
 /// Between successful checks, by the wall clock (a sleeping laptop doesn't count down a timer).
-const CHECK_EVERY: Duration = Duration::from_secs(24 * 3600);
+const CHECK_EVERY: Duration = Duration::from_secs(6 * 3600);
+/// Opening the panel checks again once the last successful check is this old, so a release
+/// shows up the next time the user looks instead of up to `CHECK_EVERY` later.
+const CHECK_ON_OPEN_AFTER: Duration = Duration::from_secs(3600);
 /// After a failed check, e.g. Burn started at login before the network was up.
 const RETRY_AFTER: Duration = Duration::from_secs(30 * 60);
+/// Opening the panel while offline doesn't retry more often than this.
+const RETRY_ON_OPEN_AFTER: Duration = Duration::from_secs(5 * 60);
 const TICK: Duration = Duration::from_secs(10 * 60);
 
 /// The version in Cargo.toml, which only the release workflow replaces with the real one.
 const UNRELEASED_VERSION: &str = "0.1.0";
 
-/// Checks soon after launch and then once a day. Development and CI builds never update: they
-/// aren't versioned, so every release would look newer.
+struct Checks {
+    succeeded_at: Option<SystemTime>,
+    attempted_at: Option<SystemTime>,
+}
+
+static CHECKS: Mutex<Checks> = Mutex::new(Checks { succeeded_at: None, attempted_at: None });
+static CHECKING: AtomicBool = AtomicBool::new(false);
+
+/// Development and CI builds never update: they aren't versioned, so every release would look
+/// newer.
+fn enabled() -> bool {
+    !cfg!(debug_assertions) && env!("CARGO_PKG_VERSION") != UNRELEASED_VERSION
+}
+
+fn older_than(t: Option<SystemTime>, age: Duration) -> bool {
+    t.is_none_or(|t| t.elapsed().is_ok_and(|e| e > age))
+}
+
+/// Checks soon after launch and then every few hours.
 pub fn start(app: &AppHandle) {
-    if cfg!(debug_assertions) || env!("CARGO_PKG_VERSION") == UNRELEASED_VERSION {
+    if !enabled() {
         return;
     }
     let app = app.clone();
     std::thread::spawn(move || {
         // A minute in, so the first check doesn't compete with the first import.
         std::thread::sleep(Duration::from_secs(60));
-        let mut next = SystemTime::now();
         loop {
-            if SystemTime::now() >= next {
-                let ok = tauri::async_runtime::block_on(check(&app));
-                next = SystemTime::now() + if ok { CHECK_EVERY } else { RETRY_AFTER };
+            let due = {
+                let c = CHECKS.lock().unwrap_or_else(|e| e.into_inner());
+                older_than(c.succeeded_at, CHECK_EVERY) && older_than(c.attempted_at, RETRY_AFTER)
+            };
+            if due {
+                tauri::async_runtime::block_on(check(&app));
             }
             std::thread::sleep(TICK);
         }
     });
 }
 
-async fn check(app: &AppHandle) -> bool {
+/// Called when the panel opens: checks in the background if the last check is getting old.
+pub fn panel_opened(app: &AppHandle) {
+    if !enabled() {
+        return;
+    }
+    let due = {
+        let c = CHECKS.lock().unwrap_or_else(|e| e.into_inner());
+        older_than(c.succeeded_at, CHECK_ON_OPEN_AFTER) && older_than(c.attempted_at, RETRY_ON_OPEN_AFTER)
+    };
+    if due {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move { check(&app).await });
+    }
+}
+
+async fn check(app: &AppHandle) {
+    // The launch timer and the panel can ask at the same moment; one request is enough.
+    if CHECKING.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    // Clears the flag even if the check panics or its task is dropped, or updates would stop.
+    struct Done;
+    impl Drop for Done {
+        fn drop(&mut self) {
+            CHECKING.store(false, Ordering::Release);
+        }
+    }
+    let _done = Done;
+    let ok = run_check(app).await;
+    {
+        let mut c = CHECKS.lock().unwrap_or_else(|e| e.into_inner());
+        let now = SystemTime::now();
+        c.attempted_at = Some(now);
+        if ok {
+            c.succeeded_at = Some(now);
+        }
+    }
+}
+
+async fn run_check(app: &AppHandle) -> bool {
     let model = app.state::<Arc<Model>>().inner().clone();
     let result = match app.updater() {
         Ok(u) => u.check().await,

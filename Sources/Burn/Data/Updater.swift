@@ -24,13 +24,23 @@ final class Updater {
     nonisolated static let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
     nonisolated private static let latestURL = URL(string: "https://api.github.com/repos/noyex/burn/releases/latest")!
 
+    /// When the last check got an answer, so opening the popover can tell whether it's stale.
+    @ObservationIgnored private(set) var checkedAt: Date?
+    /// When the last check started, answered or not, so a failing one isn't retried on every open.
+    @ObservationIgnored private(set) var attemptedAt: Date?
+    @ObservationIgnored private var checking = false
+
     func check() async {
         // Builds without a release tag report 0.0.0; there's nothing sensible to compare them with.
-        guard Self.current != "0.0.0", state == .idle else { return }
+        guard Self.current != "0.0.0", state == .idle, !checking else { return }
+        checking = true
+        attemptedAt = .now
+        defer { checking = false }
         var req = URLRequest(url: Self.latestURL)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         guard let (status, data) = try? await httpData(req), status == 200,
               let release = Self.parse(data) else { return }
+        checkedAt = .now
         // Cleared again when the release was pulled or this copy got updated some other way.
         available = Self.isNewer(release.version, than: Self.current) ? release : nil
     }

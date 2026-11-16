@@ -80,6 +80,7 @@ impl Panel {
         if let Some(model) = app.try_state::<Arc<Model>>() {
             model.panel_opened();
         }
+        crate::update::panel_opened(app);
     }
 
     pub fn hide(&self, app: &AppHandle) {

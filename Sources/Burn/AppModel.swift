@@ -56,6 +56,7 @@ final class AppModel {
     @ObservationIgnored private var limitsFetchedAt: Date?
     @ObservationIgnored private var refreshingLimits = false
     @ObservationIgnored private var timers: [Timer] = []
+    @ObservationIgnored private var checkingUpdates = false
 
     init() {
         shelf = ShelfStore(settings: settings)
@@ -67,10 +68,26 @@ final class AppModel {
         Task { await loadUsage(); await sync() }
         schedule(every: 120) { [weak self] in await self?.refreshLimits() }
         schedule(every: 300) { [weak self] in await self?.sync() }
+        self.checkingUpdates = checkingUpdates
         if checkingUpdates {
-            Task { await updater.check() }
-            schedule(every: 86_400) { [weak self] in await self?.updater.check() }
+            // Same schedule as the Windows app: a minute in, so the first check doesn't compete
+            // with the first import, then every 6 h, retrying a failed check after 30 min.
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(60))
+                await self?.checkUpdatesIfDue(every: 6 * 3600, retryAfter: 1800)
+            }
+            schedule(every: 600) { [weak self] in await self?.checkUpdatesIfDue(every: 6 * 3600, retryAfter: 1800) }
         }
+    }
+
+    /// Checks when the last answer is older than `every` and the last attempt older than
+    /// `retryAfter`, by the wall clock (a sleeping Mac doesn't count down a timer).
+    private func checkUpdatesIfDue(every: TimeInterval, retryAfter: TimeInterval) async {
+        guard checkingUpdates,
+              (updater.checkedAt.map { Date.now.timeIntervalSince($0) > every }) ?? true,
+              (updater.attemptedAt.map { Date.now.timeIntervalSince($0) > retryAfter }) ?? true
+        else { return }
+        await updater.check()
     }
 
     func popoverOpened() {
@@ -80,6 +97,8 @@ final class AppModel {
         if (lastSync.map { Date.now.timeIntervalSince($0) > 60 }) ?? true {
             Task { await sync() }
         }
+        // A release shows up the next time the user looks, not hours later.
+        Task { await checkUpdatesIfDue(every: 3600, retryAfter: 300) }
     }
 
     // MARK: Menu bar
