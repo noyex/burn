@@ -70,9 +70,24 @@ final class AppModel {
         schedule(every: 300) { [weak self] in await self?.sync() }
         self.checkingUpdates = checkingUpdates
         if checkingUpdates {
-            Task { await updater.check() }
-            schedule(every: 6 * 3600) { [weak self] in await self?.updater.check() }
+            // Same schedule as the Windows app: a minute in, so the first check doesn't compete
+            // with the first import, then every 6 h, retrying a failed check after 30 min.
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(60))
+                await self?.checkUpdatesIfDue(every: 6 * 3600, retryAfter: 1800)
+            }
+            schedule(every: 600) { [weak self] in await self?.checkUpdatesIfDue(every: 6 * 3600, retryAfter: 1800) }
         }
+    }
+
+    /// Checks when the last answer is older than `every` and the last attempt older than
+    /// `retryAfter`, by the wall clock (a sleeping Mac doesn't count down a timer).
+    private func checkUpdatesIfDue(every: TimeInterval, retryAfter: TimeInterval) async {
+        guard checkingUpdates,
+              (updater.checkedAt.map { Date.now.timeIntervalSince($0) > every }) ?? true,
+              (updater.attemptedAt.map { Date.now.timeIntervalSince($0) > retryAfter }) ?? true
+        else { return }
+        await updater.check()
     }
 
     func popoverOpened() {
@@ -83,11 +98,7 @@ final class AppModel {
             Task { await sync() }
         }
         // A release shows up the next time the user looks, not hours later.
-        if checkingUpdates,
-           (updater.checkedAt.map { Date.now.timeIntervalSince($0) > 3600 }) ?? true,
-           (updater.attemptedAt.map { Date.now.timeIntervalSince($0) > 300 }) ?? true {
-            Task { await updater.check() }
-        }
+        Task { await checkUpdatesIfDue(every: 3600, retryAfter: 300) }
     }
 
     // MARK: Menu bar

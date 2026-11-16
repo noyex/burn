@@ -84,6 +84,14 @@ async fn check(app: &AppHandle) {
     if CHECKING.swap(true, Ordering::AcqRel) {
         return;
     }
+    // Clears the flag even if the check panics or its task is dropped, or updates would stop.
+    struct Done;
+    impl Drop for Done {
+        fn drop(&mut self) {
+            CHECKING.store(false, Ordering::Release);
+        }
+    }
+    let _done = Done;
     let ok = run_check(app).await;
     {
         let mut c = CHECKS.lock().unwrap_or_else(|e| e.into_inner());
@@ -93,7 +101,6 @@ async fn check(app: &AppHandle) {
             c.succeeded_at = Some(now);
         }
     }
-    CHECKING.store(false, Ordering::Release);
 }
 
 async fn run_check(app: &AppHandle) -> bool {
