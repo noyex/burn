@@ -101,6 +101,16 @@ struct PopoverView: View {
         // Under Reduce Motion the content changes place and size without sliding there.
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: contentX)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onChange(of: visible) { _, visible in
+            // The panel opens on the usage page again, never in settings or the theme picker.
+            guard !visible else { return }
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) {
+                showingSettings = false
+                pickingTheme = false
+            }
+        }
     }
 
     private var main: some View {
