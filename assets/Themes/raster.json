@@ -34,50 +34,45 @@
       "pattern": {
         "type": "halftone",
         "color": "#FF6A3D",
-        "opacity": 0.8,
+        "opacity": 1,
         "spacing": 7,
-        "size": 2.6,
-        "fade": "top"
+        "size": 3
       }
     },
     "mono": {
       "pattern": {
         "type": "halftone",
         "color": "#2BFF88",
-        "opacity": 0.8,
+        "opacity": 1,
         "spacing": 7,
-        "size": 2.6,
-        "fade": "top"
+        "size": 3
       }
     },
     "lavender": {
       "pattern": {
         "type": "halftone",
         "color": "#9D7BFF",
-        "opacity": 0.8,
+        "opacity": 1,
         "spacing": 7,
-        "size": 2.6,
-        "fade": "top"
+        "size": 3
       }
     },
     "sky": {
       "pattern": {
         "type": "halftone",
         "color": "#38BDF8",
-        "opacity": 0.8,
+        "opacity": 1,
         "spacing": 7,
-        "size": 2.6,
-        "fade": "top"
+        "size": 3
       }
     },
     "accent": {
       "pattern": {
         "type": "halftone",
         "color": "#FFD23F",
-        "opacity": 0.8,
+        "opacity": 1,
         "spacing": 7,
-        "size": 2.6,
-        "fade": "top"
+        "size": 3
       }
     }
   }

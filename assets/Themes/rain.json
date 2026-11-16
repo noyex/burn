@@ -34,8 +34,8 @@
       "pattern": {
         "type": "rain",
         "color": "#FF6A3D",
-        "highlight": "#FFFFFF",
-        "opacity": 0.85,
+        "highlight": "#FFC2AD",
+        "opacity": 1,
         "spacing": 8,
         "size": 1.6
       }
@@ -44,8 +44,8 @@
       "pattern": {
         "type": "rain",
         "color": "#2BFF88",
-        "highlight": "#FFFFFF",
-        "opacity": 0.85,
+        "highlight": "#B8FFD6",
+        "opacity": 1,
         "spacing": 8,
         "size": 1.6
       }
@@ -54,8 +54,8 @@
       "pattern": {
         "type": "rain",
         "color": "#9D7BFF",
-        "highlight": "#FFFFFF",
-        "opacity": 0.85,
+        "highlight": "#D9CCFF",
+        "opacity": 1,
         "spacing": 8,
         "size": 1.6
       }
@@ -64,8 +64,8 @@
       "pattern": {
         "type": "rain",
         "color": "#38BDF8",
-        "highlight": "#FFFFFF",
-        "opacity": 0.85,
+        "highlight": "#BDE8FF",
+        "opacity": 1,
         "spacing": 8,
         "size": 1.6
       }
@@ -74,8 +74,8 @@
       "pattern": {
         "type": "rain",
         "color": "#FFD23F",
-        "highlight": "#FFFFFF",
-        "opacity": 0.85,
+        "highlight": "#FFEFA8",
+        "opacity": 1,
         "spacing": 8,
         "size": 1.6
       }
