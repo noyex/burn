@@ -453,7 +453,9 @@ fn block(
         );
     }
     if let Some(pattern) = &background.pattern {
-        pattern_svg(out, id, pattern, resolve(theme, &pattern.color), b);
+        let color = resolve(theme, &pattern.color);
+        let highlight = pattern.highlight.as_ref().map_or(color, |paint| resolve(theme, paint));
+        pattern_svg(out, id, pattern, color, highlight, slot, b);
     }
     // A picture that can't be read leaves nothing to draw.
     if out.is_empty() {
@@ -475,7 +477,7 @@ fn pattern_path(kind: PatternKind, step: f64, mark: f64, w: f64, h: f64) -> Stri
     };
     let mut d = String::new();
     match kind {
-        // The share image is a still: animated kinds show their dot field at rest.
+        // Animated kinds are drawn by `still_frame`.
         PatternKind::Dots | PatternKind::Wave | PatternKind::Level | PatternKind::Halftone | PatternKind::Rain => {
             let (r, diameter) = ((mark / 2.0) as f32, mark as f32);
             for x in marks(step / 2.0, w) {
@@ -501,8 +503,185 @@ fn pattern_path(kind: PatternKind, step: f64, mark: f64, w: f64, h: f64) -> Stri
     d
 }
 
+/// Time of the still frame, the same as under Reduce Motion in the panel and on the Mac.
+const STILL_TIME: f64 = 6.0;
+
+/// A stable, distinct offset per block token, like `PatternSeed.of` on the Mac.
+fn pattern_seed(slot: Token) -> f64 {
+    let hash = slot.key().chars().fold(0u32, |acc, c| (acc * 31 + c as u32) % 997);
+    f64::from(hash) * 0.37
+}
+
+/// One fill of an animated pattern: `alpha` applies to the ink or, when `highlight`, to the highlight.
+struct Fill {
+    highlight: bool,
+    alpha: f64,
+    d: String,
+}
+
+/// Dots collected into one path per alpha step, like `DotBuckets` on the Mac.
+struct DotBuckets {
+    paths: Vec<String>,
+}
+
+impl DotBuckets {
+    fn new(steps: usize) -> DotBuckets {
+        DotBuckets { paths: vec![String::new(); steps] }
+    }
+
+    /// `alpha` in 0...1 is rounded up to the nearest step.
+    fn dot(&mut self, x: f64, y: f64, radius: f64, alpha: f64) {
+        if alpha <= 0.01 || radius <= 0.0 {
+            return;
+        }
+        let steps = self.paths.len();
+        let step = ((alpha * steps as f64).ceil() as i64 - 1).clamp(0, steps as i64 - 1) as usize;
+        circle(&mut self.paths[step], x, y, radius);
+    }
+
+    fn into_fills(self, highlight: bool, out: &mut Vec<Fill>) {
+        let steps = self.paths.len();
+        for (i, d) in self.paths.into_iter().enumerate().filter(|(_, d)| !d.is_empty()) {
+            out.push(Fill { highlight, alpha: (i + 1) as f64 / steps as f64, d });
+        }
+    }
+}
+
+fn circle(d: &mut String, x: f64, y: f64, r: f64) {
+    let _ = write!(
+        d,
+        "M{} {}a{} {} 0 1 0 {} 0a{} {} 0 1 0 -{} 0",
+        (x - r) as f32,
+        y as f32,
+        r as f32,
+        r as f32,
+        (2.0 * r) as f32,
+        r as f32,
+        r as f32,
+        (2.0 * r) as f32
+    );
+}
+
+fn fract(v: f64) -> f64 {
+    v - v.floor()
+}
+
+fn hash(n: f64) -> f64 {
+    fract((n * 127.1).sin() * 43758.5453)
+}
+
+fn smooth(a: f64, b: f64, v: f64) -> f64 {
+    let u = ((v - a) / (b - a)).clamp(0.0, 1.0);
+    u * u * (3.0 - 2.0 * u)
+}
+
+/// `start`, `start + step`, ... below `limit`, computed by multiplication like Swift's `stride`.
+fn span(start: f64, limit: f64, step: f64) -> impl Iterator<Item = f64> {
+    (0..).map(move |i| start + f64::from(i) * step).take_while(move |v| *v < limit)
+}
+
+/// One frame of an animated pattern at `STILL_TIME`, a port of `AnimatedPattern` in
+/// `BlockDecoration.swift`. `level` is what the `level` pattern fills up to.
+fn still_frame(kind: PatternKind, spacing: f64, mark: f64, w: f64, h: f64, level: f64, seed: f64) -> Vec<Fill> {
+    let time = STILL_TIME;
+    let mut fills = Vec::new();
+    match kind {
+        PatternKind::Wave => {
+            let (rows, top) = (14, 0.42);
+            let mut crests = DotBuckets::new(4);
+            for r in 0..rows {
+                let p = f64::from(r) / f64::from(rows - 1);
+                let y0 = h * top + p * p * h * (1.0 - top) * 1.02;
+                // 0.6x at the back, 1x in the middle, 1.6x at the front.
+                let spread = if p < 0.5 { 0.6 + 0.8 * p } else { 1.0 + 1.2 * (p - 0.5) };
+                let sp = spacing * spread;
+                let radius = mark / 2.0 * (0.4 + 1.2 * p);
+                let amp = 2.0 + p * 10.0;
+                let n = (w / sp / 2.0).ceil() as i64 + 1;
+                let mut layer = String::new();
+                for c in -n..=n {
+                    let col = c as f64;
+                    let rr = f64::from(r);
+                    let hgt = (col * 0.33 + time * 1.05 + rr * 0.42 + seed).sin()
+                        * (rr * 0.28 - time * 0.55 + col * 0.05).cos();
+                    let (px, py) = (w / 2.0 + col * sp, y0 - hgt * amp);
+                    circle(&mut layer, px, py, radius);
+                    if p > 0.2 && p < 0.85 && hgt > 0.7 {
+                        let glow = smooth(0.7, 0.95, hgt);
+                        crests.dot(px, py, radius + glow * mark * 0.33, glow);
+                    }
+                }
+                fills.push(Fill { highlight: false, alpha: 0.06 + p * 0.75, d: layer });
+            }
+            crests.into_fills(true, &mut fills);
+        }
+        PatternKind::Level => {
+            let lvl = h * (1.0 - level.clamp(0.0, 1.0) * 0.92);
+            let surface =
+                |x: f64| lvl + (x * 0.045 + time * 1.6 + seed).sin() * 2.2 + (x * 0.02 - time * 0.9).sin() * 1.6;
+            let mut tint = format!("M0 {}", h as f32);
+            let mut x = 0.0;
+            while x <= w {
+                let _ = write!(tint, "L{} {}", x as f32, surface(x) as f32);
+                x += 4.0;
+            }
+            let _ = write!(tint, "L{} {}Z", w as f32, h as f32);
+            fills.push(Fill { highlight: false, alpha: 0.1, d: tint });
+            let mut below = DotBuckets::new(16);
+            let mut top = String::new();
+            for x in span(spacing / 2.0, w, spacing) {
+                let sy = surface(x);
+                circle(&mut top, x, sy, mark * 0.7);
+                for y in span(sy + spacing, h, spacing) {
+                    below.dot(x, y, mark / 2.0, 0.22 * (1.0 - (y - sy) / (h - lvl + 20.0)) / 0.95);
+                }
+            }
+            below.into_fills(false, &mut fills);
+            fills.push(Fill { highlight: true, alpha: 0.95, d: top });
+        }
+        PatternKind::Halftone => {
+            let mut dots = DotBuckets::new(16);
+            for x in span(spacing / 2.0, w, spacing) {
+                for y in span(spacing / 2.0, h, spacing) {
+                    let n = ((x * 0.04 + time * 0.7 + seed).sin()
+                        + (y * 0.06 - time * 0.5).sin()
+                        + ((x + y) * 0.025 + time * 0.35).sin())
+                        / 3.0;
+                    let v = (n * 0.5 + 0.5).max(0.0);
+                    dots.dot(x, y, mark / 2.0 * (0.115 + 0.885 * v * v), (0.15 + v * 0.6) * y / h / 0.75);
+                }
+            }
+            dots.into_fills(false, &mut fills);
+        }
+        PatternKind::Rain => {
+            let mut trail = DotBuckets::new(16);
+            let mut heads = String::new();
+            let radius = mark / 2.0;
+            for (col, x) in span(spacing / 2.0, w, spacing).enumerate() {
+                let s = seed + col as f64;
+                let speed = 0.18 + hash(s) * 0.3;
+                let head = fract(time * speed + hash(s + 1.0)) * (h + 60.0) - 20.0;
+                let length = 6.0 + (hash(s + 2.0) * 8.0).floor();
+                for y in span(spacing / 2.0, h, spacing) {
+                    let d = (head - y) / spacing;
+                    if (0.0..1.0).contains(&d) {
+                        circle(&mut heads, x, y, radius * 1.75);
+                    } else {
+                        let a = if d > 0.0 && d < length { ((1.0 - d / length) * 0.85).max(0.05) } else { 0.05 };
+                        trail.dot(x, y, radius, a);
+                    }
+                }
+            }
+            trail.into_fills(false, &mut fills);
+            fills.push(Fill { highlight: true, alpha: 0.9, d: heads });
+        }
+        _ => {}
+    }
+    fills
+}
+
 /// A pattern at its point size (the Mac draws the card at 1x too), faded toward one edge by a mask.
-fn pattern_svg(out: &mut String, id: u32, pattern: &Pattern, color: Rgba, b: &Rect) {
+fn pattern_svg(out: &mut String, id: u32, pattern: &Pattern, color: Rgba, highlight: Rgba, slot: Token, b: &Rect) {
     let opacity = (pattern.opacity * color.a) as f32;
     let mask = match pattern.fade {
         None => String::new(),
@@ -520,6 +699,32 @@ fn pattern_svg(out: &mut String, id: u32, pattern: &Pattern, color: Rgba, b: &Re
             format!(r#" mask="url(#m{id})""#)
         }
     };
+    if matches!(pattern.kind, PatternKind::Wave | PatternKind::Level | PatternKind::Halftone | PatternKind::Rain) {
+        // A still frame, like `ImageRenderer` on the Mac: no Reduce Motion needed, the level fills halfway.
+        let fills = still_frame(
+            pattern.kind,
+            pattern.spacing,
+            pattern.size,
+            f64::from(b.w),
+            f64::from(b.h),
+            0.5,
+            pattern_seed(slot),
+        );
+        let _ =
+            write!(out, r#"<g opacity="{}"{mask}><g transform="translate({} {})">"#, pattern.opacity as f32, b.x, b.y);
+        for fill in fills.iter().filter(|f| !f.d.is_empty()) {
+            let ink = if fill.highlight { highlight } else { color };
+            let _ = write!(
+                out,
+                r#"<path fill="{}" fill-opacity="{}" d="{}"/>"#,
+                rgb(ink),
+                (fill.alpha * ink.a) as f32,
+                fill.d
+            );
+        }
+        out.push_str("</g></g>");
+        return;
+    }
     let d = pattern_path(pattern.kind, pattern.spacing, pattern.size, f64::from(b.w), f64::from(b.h));
     let paint = match pattern.kind {
         PatternKind::Grid | PatternKind::Lines => {
@@ -1004,6 +1209,22 @@ mod tests {
         // Diagonals start one block height to the left and lean to the right.
         let lines = pattern_path(PatternKind::Lines, 10.0, 1.0, 25.0, 15.0);
         assert_eq!(lines, "M-15 15L0 0M-5 15L10 0M5 15L20 0M15 15L30 0");
+    }
+
+    #[test]
+    fn animated_kinds_render_a_still_frame() {
+        // Same value as `PatternSeed.of(.accent)` on the Mac: 560 * 0.37.
+        assert!((pattern_seed(Token::Accent) - 560.0 * 0.37).abs() < 1e-9);
+        for kind in [PatternKind::Wave, PatternKind::Level, PatternKind::Halftone, PatternKind::Rain] {
+            let fills = still_frame(kind, 8.0, 3.0, 120.0, 80.0, 0.5, pattern_seed(Token::Coral));
+            assert!(!fills.is_empty() && fills.iter().all(|f| !f.d.is_empty()), "{kind:?}");
+            assert!(fills.iter().all(|f| f.alpha > 0.0 && f.alpha <= 1.0), "{kind:?}");
+        }
+        // Wave crests and rain heads are drawn in the highlight; halftone only in the ink.
+        let wave = still_frame(PatternKind::Wave, 8.0, 3.0, 300.0, 120.0, 0.5, 0.0);
+        assert!(!wave[..14].iter().any(|f| f.highlight), "rows come first, in the ink");
+        assert!(still_frame(PatternKind::Halftone, 8.0, 3.0, 120.0, 80.0, 0.5, 0.0).iter().all(|f| !f.highlight));
+        assert!(still_frame(PatternKind::Rain, 8.0, 3.0, 120.0, 80.0, 0.5, 0.0).last().is_some_and(|f| f.highlight));
     }
 
     #[test]
