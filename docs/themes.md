@@ -191,7 +191,7 @@ cards), `neutral` (notices and empty states) and `surface` (the settings panel).
 
 `spacing` is the distance between dots (for `wave`, in the middle row: rows further back are
 tighter) and `size` the dot diameter. They move only while the panel is open, stand still when
-Reduce Motion is on (Windows: when animations are off), and the share image shows a still frame (Windows: plain dots).
+Reduce Motion is on (Windows: when animations are off), and the share image shows a still frame.
 To give every block its own color, set a different `color` or `highlight` per block.
 
 Any color here is `#RRGGBB`, `#RRGGBBAA`, or the name of a token (`"accent-ink"`), which then
