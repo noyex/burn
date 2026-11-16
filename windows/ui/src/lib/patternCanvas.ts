@@ -160,8 +160,11 @@ let lastTick = 0;
 let lastDraw = 0;
 let nextPhase = 0;
 let listening = false;
-/** False while the panel is hidden: the webview may stay "visible" for minutes after it closes. */
-let active = true;
+/**
+ * False while the panel is hidden: the webview may stay "visible" for minutes after it closes.
+ * In the app the panel starts hidden; a plain browser (demo, screenshots) has no panel events.
+ */
+let active = !(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
 
 const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
