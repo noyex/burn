@@ -150,11 +150,31 @@ struct BlockBackground: Equatable, Sendable {
     }
 
     struct Pattern: Equatable, Sendable {
-        enum Kind: String, CaseIterable, Sendable { case dots, grid, lines }
+        enum Kind: String, CaseIterable, Sendable {
+            case dots, grid, lines
+            /// Animated: rows of dots rolling like a wave seen from above.
+            case wave
+            /// Animated: the block filled up to what's left of its limit, with a moving surface.
+            case level
+            /// Animated: a dot grid whose dots swell and shrink in drifting patches.
+            case halftone
+            /// Animated: drops of dots falling down columns, leaving a fading trail.
+            case rain
+
+            /// Kinds that move while the panel is open.
+            var isAnimated: Bool {
+                switch self {
+                case .dots, .grid, .lines: false
+                case .wave, .level, .halftone, .rain: true
+                }
+            }
+        }
         enum Fade: String, CaseIterable, Sendable { case top, bottom }
 
         var kind: Kind
         var color: Paint
+        /// Wave crests, the level's surface and the heads of rain drops; nil uses `color`.
+        var highlight: Paint?
         var opacity = 0.25
         /// Distance between marks, and how thick each one is, in points.
         var spacing = 8.0
@@ -398,9 +418,10 @@ struct ResolvedTheme: Equatable, Sendable {
 
                     if let pattern = block["pattern"] as? [String: Any] {
                         let at = "\(path).pattern"
-                        unknownKeys(pattern, at: at, known: ["type", "color", "opacity", "spacing", "size", "fade"])
+                        unknownKeys(pattern, at: at, known: ["type", "color", "highlight", "opacity", "spacing", "size", "fade"])
                         if let kind = (pattern["type"] as? String).flatMap(BlockBackground.Pattern.Kind.init) {
                             var result = BlockBackground.Pattern(kind: kind, color: paint(pattern, "color", at: at) ?? .token(ink))
+                            result.highlight = paint(pattern, "highlight", at: at)
                             result.opacity = number(pattern, "opacity", at: at, in: 0...1) ?? result.opacity
                             result.spacing = number(pattern, "spacing", at: at, in: 3...64) ?? result.spacing
                             result.size = number(pattern, "size", at: at, in: 0.5...16) ?? result.size
@@ -410,7 +431,8 @@ struct ResolvedTheme: Equatable, Sendable {
                             }
                             background.pattern = result
                         } else {
-                            issues.append("\(at).type: use \"dots\", \"grid\" or \"lines\".")
+                            let kinds = BlockBackground.Pattern.Kind.allCases.map { "\"\($0.rawValue)\"" }
+                            issues.append("\(at).type: use \(kinds.dropLast().joined(separator: ", ")) or \(kinds.last ?? "").")
                         }
                     } else if block["pattern"] != nil {
                         issues.append("\(path).pattern: must be an object.")

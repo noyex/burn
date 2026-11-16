@@ -63,6 +63,9 @@ private struct PatternCanvas: View {
                     path.addLine(to: CGPoint(x: x + size.height, y: 0))
                 }
                 context.stroke(path, with: .color(color), lineWidth: mark)
+            case .wave, .level, .halftone, .rain:
+                // Drawn by the animated renderer.
+                break
             }
         }
         .opacity(pattern.opacity)

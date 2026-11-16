@@ -1,0 +1,71 @@
+{
+  "name": "Pastel",
+  "colors": {
+    "coral": "#FBE1D3",
+    "coral-ink": "#2A130A",
+    "mono": "#D9F5E1",
+    "mono-ink": "#0A2614",
+    "lavender": "#E4DEFF",
+    "lavender-ink": "#1B1840",
+    "sky": "#D6EEFB",
+    "sky-ink": "#0C2C42",
+    "accent": "#F1F5C4",
+    "accent-ink": "#1D2106"
+  },
+  "shape": {
+    "radius": 14,
+    "gap": 6
+  },
+  "backgrounds": {
+    "coral": {
+      "pattern": {
+        "type": "wave",
+        "color": "coral-ink",
+        "highlight": "#FF5A1F",
+        "opacity": 0.6,
+        "spacing": 8,
+        "size": 1.6
+      }
+    },
+    "mono": {
+      "pattern": {
+        "type": "wave",
+        "color": "mono-ink",
+        "highlight": "#0FB84A",
+        "opacity": 0.6,
+        "spacing": 8,
+        "size": 1.6
+      }
+    },
+    "lavender": {
+      "pattern": {
+        "type": "wave",
+        "color": "lavender-ink",
+        "highlight": "#6E55FF",
+        "opacity": 0.6,
+        "spacing": 8,
+        "size": 1.6
+      }
+    },
+    "sky": {
+      "pattern": {
+        "type": "wave",
+        "color": "sky-ink",
+        "highlight": "#0A8FD6",
+        "opacity": 0.6,
+        "spacing": 8,
+        "size": 1.6
+      }
+    },
+    "accent": {
+      "pattern": {
+        "type": "wave",
+        "color": "accent-ink",
+        "highlight": "#A8B800",
+        "opacity": 0.6,
+        "spacing": 8,
+        "size": 1.6
+      }
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "name": "Tide",
+  "colors": {
+    "base": "#0A0A0A",
+    "surface": "#0F0F10",
+    "neutral": "#141415",
+    "neutral-hover": "#1C1C1E",
+    "raised": "#26262A",
+    "text": "#F5F5F5",
+    "secondary": "#8A8A8A",
+    "switcher": "#0F0F10",
+    "switcher-ink": "#F5F5F5",
+    "hairline": "#FFFFFF14",
+    "shadow": "#00000080",
+    "accent": "#0B0B0B",
+    "accent-ink": "#F5F5F5",
+    "coral": "#0B0B0B",
+    "coral-ink": "#F5F5F5",
+    "mono": "#0B0B0B",
+    "mono-ink": "#F5F5F5",
+    "lavender": "#0B0B0B",
+    "lavender-ink": "#F5F5F5",
+    "sky": "#0B0B0B",
+    "sky-ink": "#F5F5F5",
+    "selection": "#38BDF8"
+  },
+  "shape": {
+    "radius": 14,
+    "gap": 6
+  },
+  "backgrounds": {
+    "coral": {
+      "pattern": {
+        "type": "level",
+        "color": "#FF6A3D",
+        "highlight": "#FF6A3D",
+        "opacity": 0.9,
+        "spacing": 6,
+        "size": 1.4
+      }
+    },
+    "mono": {
+      "pattern": {
+        "type": "level",
+        "color": "#2BFF88",
+        "highlight": "#2BFF88",
+        "opacity": 0.9,
+        "spacing": 6,
+        "size": 1.4
+      }
+    },
+    "lavender": {
+      "pattern": {
+        "type": "level",
+        "color": "#9D7BFF",
+        "highlight": "#9D7BFF",
+        "opacity": 0.9,
+        "spacing": 6,
+        "size": 1.4
+      }
+    },
+    "sky": {
+      "pattern": {
+        "type": "level",
+        "color": "#38BDF8",
+        "highlight": "#38BDF8",
+        "opacity": 0.9,
+        "spacing": 6,
+        "size": 1.4
+      }
+    },
+    "accent": {
+      "pattern": {
+        "type": "wave",
+        "color": "#FFD23F",
+        "highlight": "#FFFFFF",
+        "opacity": 0.8,
+        "spacing": 8,
+        "size": 1.6
+      }
+    }
+  }
+}

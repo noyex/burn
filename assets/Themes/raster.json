@@ -1,0 +1,84 @@
+{
+  "name": "Raster",
+  "colors": {
+    "base": "#0A0A0A",
+    "surface": "#0F0F10",
+    "neutral": "#141415",
+    "neutral-hover": "#1C1C1E",
+    "raised": "#26262A",
+    "text": "#F5F5F5",
+    "secondary": "#8A8A8A",
+    "switcher": "#0F0F10",
+    "switcher-ink": "#F5F5F5",
+    "hairline": "#FFFFFF14",
+    "shadow": "#00000080",
+    "accent": "#0B0B0B",
+    "accent-ink": "#F5F5F5",
+    "coral": "#0B0B0B",
+    "coral-ink": "#F5F5F5",
+    "mono": "#0B0B0B",
+    "mono-ink": "#F5F5F5",
+    "lavender": "#0B0B0B",
+    "lavender-ink": "#F5F5F5",
+    "sky": "#0B0B0B",
+    "sky-ink": "#F5F5F5",
+    "selection": "#9D7BFF"
+  },
+  "shape": {
+    "radius": 10,
+    "pill": 10,
+    "gap": 6
+  },
+  "backgrounds": {
+    "coral": {
+      "pattern": {
+        "type": "halftone",
+        "color": "#FF6A3D",
+        "opacity": 0.8,
+        "spacing": 7,
+        "size": 2.6,
+        "fade": "top"
+      }
+    },
+    "mono": {
+      "pattern": {
+        "type": "halftone",
+        "color": "#2BFF88",
+        "opacity": 0.8,
+        "spacing": 7,
+        "size": 2.6,
+        "fade": "top"
+      }
+    },
+    "lavender": {
+      "pattern": {
+        "type": "halftone",
+        "color": "#9D7BFF",
+        "opacity": 0.8,
+        "spacing": 7,
+        "size": 2.6,
+        "fade": "top"
+      }
+    },
+    "sky": {
+      "pattern": {
+        "type": "halftone",
+        "color": "#38BDF8",
+        "opacity": 0.8,
+        "spacing": 7,
+        "size": 2.6,
+        "fade": "top"
+      }
+    },
+    "accent": {
+      "pattern": {
+        "type": "halftone",
+        "color": "#FFD23F",
+        "opacity": 0.8,
+        "spacing": 7,
+        "size": 2.6,
+        "fade": "top"
+      }
+    }
+  }
+}
