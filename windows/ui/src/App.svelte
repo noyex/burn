@@ -1,6 +1,7 @@
 <!-- The panel (PopoverView.swift): provider cards, spend, and a footer, floating over the desktop. -->
 <script lang="ts">
   import { onMount } from "svelte";
+  import { setPatternsActive } from "./lib/patternCanvas";
   import { contentResized, getState, hidePanel, onPanel, onState, setPeriod, setTheme, shelfCopy, shelfDelete } from "./lib/api";
   import { appearance } from "./lib/appearance.svelte";
   import { clock } from "./lib/clock.svelte";
@@ -186,10 +187,12 @@
       await onPanel(
         () => {
           clock.now = Date.now();
+          setPatternsActive(true);
           visible = false;
           requestAnimationFrame(() => requestAnimationFrame(() => (visible = true)));
         },
         () => {
+          setPatternsActive(false);
           visible = false;
           // The panel opens on the usage page again, never in the middle of editing.
           editing = false;

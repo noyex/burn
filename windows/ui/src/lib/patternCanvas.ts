@@ -160,6 +160,8 @@ let lastTick = 0;
 let lastDraw = 0;
 let nextPhase = 0;
 let listening = false;
+/** False while the panel is hidden: the webview may stay "visible" for minutes after it closes. */
+let active = true;
 
 const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -197,9 +199,11 @@ function drawAll(now: number) {
   for (const e of entries) draw(e, now);
 }
 
+const running = () => active && !document.hidden;
+
 function loop(now: number) {
   frame = 0;
-  if (entries.size === 0 || document.hidden || reducedMotion()) return;
+  if (entries.size === 0 || !running() || reducedMotion()) return;
   frame = requestAnimationFrame(loop);
   if (now - lastDraw < FRAME_MS - 1) return;
   t += Math.min(now - (lastTick || now), 100) / 1000;
@@ -214,7 +218,7 @@ function sync() {
     drawAll(performance.now());
     return;
   }
-  if (!frame && entries.size > 0 && !document.hidden) {
+  if (!frame && entries.size > 0 && running()) {
     lastTick = 0;
     frame = requestAnimationFrame(loop);
   }
@@ -224,12 +228,28 @@ function listen() {
   if (listening) return;
   listening = true;
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && frame) {
+    if (!running() && frame) {
       cancelAnimationFrame(frame);
       frame = 0;
     } else sync();
   });
-  if (typeof matchMedia === "function") matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", sync);
+  if (typeof matchMedia === "function") {
+    matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", sync);
+    // Token colors follow light/dark: look them up again and, when still, redraw right away.
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+      for (const e of entries) e.resolvedAt = 0;
+      if (reducedMotion()) drawAll(performance.now());
+    });
+  }
+}
+
+/** Pauses every pattern while the panel is hidden and resumes it when it is shown again. */
+export function setPatternsActive(on: boolean) {
+  active = on;
+  if (!on && frame) {
+    cancelAnimationFrame(frame);
+    frame = 0;
+  } else if (on) sync();
 }
 
 /** Svelte action: draws the animated pattern on `canvas` and keeps it up to date. */
