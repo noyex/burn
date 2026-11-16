@@ -101,6 +101,8 @@ struct PopoverView: View {
         // Under Reduce Motion the content changes place and size without sliding there.
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: contentX)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // Animated theme patterns stand still while the panel is closed.
+        .environment(\.patternsMoving, visible)
     }
 
     private var main: some View {

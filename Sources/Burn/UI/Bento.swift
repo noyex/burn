@@ -47,7 +47,7 @@ extension View {
         background {
             shape.fill(theme.color(slot)).overlay {
                 if let background = theme.background(slot) {
-                    BlockDecoration(background: background, theme: theme).clipShape(shape)
+                    BlockDecoration(background: background, theme: theme, seed: PatternSeed.of(slot)).clipShape(shape)
                 }
             }
         }
@@ -71,7 +71,7 @@ private struct Floating<S: InsettableShape>: ViewModifier {
             shape.fill(fill ?? slot.map(theme.color) ?? .clear)
                 .overlay {
                     if let background = slot.flatMap(theme.background) {
-                        BlockDecoration(background: background, theme: theme).clipShape(shape)
+                        BlockDecoration(background: background, theme: theme, seed: slot.map(PatternSeed.of) ?? 0).clipShape(shape)
                     }
                 }
                 .overlay { shape.strokeBorder(theme.hairline, lineWidth: 0.5) }

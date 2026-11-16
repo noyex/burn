@@ -51,6 +51,8 @@ struct ProviderBlock: View {
         }
         .frame(maxWidth: .infinity, minHeight: size == .s ? 0 : hero ? 96 : 92, alignment: .topLeading)
         .block(color.tokens.fill, padding: size == .s ? 10 : 12)
+        // Outside `block`, so the background sees it.
+        .environment(\.blockLevel, primary.map { Double(remaining($0)) / 100 })
         .accessibilityElement(children: .combine)
     }
 
