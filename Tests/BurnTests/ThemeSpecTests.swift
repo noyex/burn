@@ -79,6 +79,23 @@ struct ThemeSpecTests {
         #expect(theme.backgrounds[.surface]?.image == .init(file: "bg.png", opacity: 0.5))
     }
 
+    @Test func parsesAnimatedPatterns() {
+        let (theme, issues) = parse(##"""
+        {"backgrounds": {
+           "coral": {"pattern": {"type": "wave", "color": "#FFFFFF", "highlight": "#FF6A3D", "spacing": 7}},
+           "mono": {"pattern": {"type": "level", "highlight": "text"}},
+           "sky": {"pattern": {"type": "rain", "highlight": "#nope"}}}}
+        """##)
+        #expect(issues == ["backgrounds.sky.pattern.highlight: use #RRGGBB, #RRGGBBAA or a token name."])
+        let wave = theme.backgrounds[.coral]?.pattern
+        #expect(wave == .init(kind: .wave, color: .color(RGBA(hex: 0xFFFFFF)), highlight: .color(RGBA(hex: 0xFF6A3D)), spacing: 7))
+        #expect(wave?.kind.isAnimated == true)
+        #expect(theme.backgrounds[.mono]?.pattern?.highlight == .token(.text))
+        // A bad highlight drops only the highlight, the rain still falls in the block's ink.
+        #expect(theme.backgrounds[.sky]?.pattern == .init(kind: .rain, color: .token(.skyInk)))
+        #expect(BlockBackground.Pattern.Kind.dots.isAnimated == false)
+    }
+
     @Test func skipsBackgroundsItCannotDraw() {
         let (theme, issues) = parse(##"""
         {"backgrounds": {

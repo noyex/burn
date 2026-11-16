@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { demoTheme } from "./demo";
+import { isAnimatedPattern } from "./patternCanvas";
 import { gradientCss, isLight, patternCss } from "./theme.svelte";
 
 describe("theme", () => {
@@ -24,10 +25,17 @@ describe("theme", () => {
     expect(patternCss({ ...base, type: "lines" }).image).toContain(`${8 / Math.SQRT2}px`);
   });
 
+  it("draws wave, level, halftone and rain on a canvas, the rest in CSS", () => {
+    const base = { color: "#FFFFFF", opacity: 0.25, spacing: 8, size: 2, fade: null };
+    for (const type of ["wave", "level", "halftone", "rain"] as const) expect(isAnimatedPattern({ ...base, type })).toBe(true);
+    for (const type of ["dots", "grid", "lines"] as const) expect(isAnimatedPattern({ ...base, type })).toBe(false);
+    expect(isAnimatedPattern(undefined)).toBe(false);
+  });
+
   it("has every built-in theme in the demo", () => {
     const all = demoTheme(null);
     expect(all.selected).toBeNull();
-    expect(all.available.map((t) => t.id)).toEqual(["aurora", "circuit", "ember", "frost", "glow-dots", "obsidian", "prism", "titanium"]);
+    expect(all.available.map((t) => t.id)).toEqual(["aurora", "circuit", "ember", "frost", "glow-dots", "neon", "nyx", "obsidian", "pastel", "prism", "rain", "raster", "tide", "titanium"]);
     for (const t of all.available) {
       const picked = demoTheme(t.id);
       expect(picked.selected).toBe(t.id);

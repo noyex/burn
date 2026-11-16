@@ -108,7 +108,7 @@ struct ShareCard: View {
     /// Renders the card at 2x and puts it on the clipboard as PNG. Returns false if rendering failed.
     @MainActor
     static func copy(_ usage: UsageSummary) -> Bool {
-        let renderer = ImageRenderer(content: ShareCard(usage: usage))
+        let renderer = ImageRenderer(content: ShareCard(usage: usage).environment(\.patternsMoving, false))
         renderer.scale = 2
         guard let image = renderer.cgImage,
               let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])

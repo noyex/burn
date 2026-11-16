@@ -97,7 +97,7 @@
   role="group"
   aria-label={name}
 >
-  <BlockArt fill={color} />
+  <BlockArt fill={color} level={primary ? remaining(primary.percent) / 100 : undefined} />
   {#if limits && primary}
     {#if size === "s"}
       {#snippet value()}

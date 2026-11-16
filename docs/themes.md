@@ -22,7 +22,7 @@ Burn watches the folder: save a file and the open panel changes within a second,
 ## Built-in themes
 
 Burn ships with a few ready-made themes, listed in Settings → Theme above your own: `aurora`,
-`circuit`, `ember`, `frost`, `glow-dots`, `obsidian`, `prism` and `titanium`. Their names work in `active.txt` too.
+`circuit`, `ember`, `frost`, `glow-dots`, `neon`, `nyx`, `obsidian`, `pastel`, `prism`, `rain`, `raster`, `tide` and `titanium`. Their names work in `active.txt` too.
 
 Their files sit next to the app and an update replaces them:
 
@@ -172,12 +172,27 @@ cards), `neutral` (notices and empty states) and `surface` (the settings panel).
 | `gradient.angle` | `180` | -360–360 | Direction in degrees, as in CSS: `0` bottom to top, `90` left to right, `180` top to bottom |
 | `image.file` | | | A picture in the themes folder (PNG or JPEG on both systems), scaled to fill the block |
 | `image.opacity` | `1` | 0–1 | |
-| `pattern.type` | | `dots`, `grid`, `lines` | |
+| `pattern.type` | | `dots`, `grid`, `lines`, `wave`, `level`, `halftone`, `rain` | The last four move, see below |
 | `pattern.color` | the block's ink | | |
+| `pattern.highlight` | `pattern.color` | | Wave crests, the `level` surface, the heads of `rain` drops |
 | `pattern.opacity` | `0.25` | 0–1 | |
 | `pattern.spacing` | `8` | 3–64 | Distance between marks, in points |
 | `pattern.size` | `1.5` | 0.5–16 | Dot diameter or line width, in points |
 | `pattern.fade` | none | `top`, `bottom` | Edge the pattern fades out toward |
+
+### Animated patterns
+
+| Type | What moves |
+|---|---|
+| `wave` | Rows of dots in perspective roll like a sea in the lower part of the block. Crests light up in `highlight`. |
+| `level` | The block fills with dots up to what's left of its limit (the big number), under a gently moving surface drawn in `highlight`. Blocks without a percentage fill halfway. |
+| `halftone` | A grid of dots that swell and shrink in slowly drifting patches. `size` is the largest dot. |
+| `rain` | Drops of dots fall down columns and leave a fading trail. The drop's head is drawn in `highlight`. |
+
+`spacing` is the distance between dots (for `wave`, in the middle row: rows further back are
+tighter) and `size` the dot diameter. They move only while the panel is open, stand still when
+Reduce Motion is on (Windows: when animations are off), and the share image shows a still frame.
+To give every block its own color, set a different `color` or `highlight` per block.
 
 Any color here is `#RRGGBB`, `#RRGGBBAA`, or the name of a token (`"accent-ink"`), which then
 follows light and dark (not the `system` ones). The share image uses the same backgrounds. Text sits on top of the background, so keep it calm enough to read: the
