@@ -68,7 +68,7 @@ export function order(saved: string[]): ProviderId[] {
 
 export function defaultWindow(p: ProviderId): string {
   // The 5-hour window is the one that actually blocks work; Cursor's API bucket is often full while the plan is fine.
-  return p === "claude" ? "5h" : p === "cursor" ? "total" : HIGHEST;
+  return p === "claude" || p === "antigravity" ? "5h" : p === "cursor" ? "total" : HIGHEST;
 }
 
 /** The chosen window, or the most used one. */

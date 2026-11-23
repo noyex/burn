@@ -621,7 +621,7 @@ pub fn make_rows(
                 format!("{key}#{n}")
             }
         } else {
-            r.dedupe_key.clone().unwrap_or_else(|| format!("claude:{path}#{i}"))
+            r.dedupe_key.clone().unwrap_or_else(|| format!("{}:{path}#{i}", r.provider))
         };
         rows.push(UsageRow::new(r, id, project, origin, path, rates));
     }
@@ -681,7 +681,7 @@ fn decode_t3_rows(
             rate_model = Some(models[ri].clone());
         }
         let mut tier = None;
-        if version >= 7.0 && r.len() > 12 {
+        if version >= 7.0 && r.len() > 12 && !r[12].is_null() {
             let Value::String(t) = &r[12] else { return None };
             tier = Some(t.clone());
         }
@@ -734,7 +734,7 @@ pub fn parse_t3_cache(path: &Path) -> io::Result<Vec<T3CacheFile>> {
     let Value::Object(d) = &root else {
         return Ok(vec![]);
     };
-    let Some(version) = num(d.get("version")).filter(|v| (4.0..=7.0).contains(v)) else { return Ok(vec![]) };
+    let Some(version) = num(d.get("version")).filter(|v| (4.0..=17.0).contains(v)) else { return Ok(vec![]) };
     let (Some(models), Some(sessions), Some(files)) =
         (string_array(d.get("models")), string_array(d.get("sessions")), obj(d.get("files")))
     else {
@@ -745,7 +745,11 @@ pub fn parse_t3_cache(path: &Path) -> io::Result<Vec<T3CacheFile>> {
     let sorted: BTreeMap<&String, &Value> = files.iter().collect();
     for (src, e) in sorted {
         let Value::Object(entry) = e else { continue };
-        let Some(provider) = str_of(entry.get("p")).filter(|p| *p == "claude" || *p == "codex") else { continue };
+        let Some(provider) =
+            str_of(entry.get("p")).filter(|p| *p == "claude" || *p == "codex" || *p == "antigravity")
+        else {
+            continue;
+        };
         if num(entry.get("s")).is_none() || num(entry.get("m")).is_none() {
             continue;
         }
@@ -1006,9 +1010,9 @@ mod tests {
         assert_eq!(cx.speed, Speed::Ultrafast);
         assert_eq!(cx.project, None);
 
-        // Versions outside 4...7 decode to nothing; version 6 ignores the tier column.
-        let v8 = json.replace("\"version\": 7", "\"version\": 8");
-        assert!(parse_t3_cache(&tmp_file("t3cache8", &v8)).unwrap().is_empty());
+        // Versions outside 4...17 decode to nothing; version 6 ignores the tier column.
+        let v18 = json.replace("\"version\": 7", "\"version\": 18");
+        assert!(parse_t3_cache(&tmp_file("t3cache18", &v18)).unwrap().is_empty());
         let v6 = json.replace("\"version\": 7", "\"version\": 6");
         let f6 = parse_t3_cache(&tmp_file("t3cache6", &v6)).unwrap();
         assert_eq!(f6[1].records[0].tier_turn, None);

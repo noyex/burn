@@ -11,16 +11,19 @@ pub enum ProviderId {
     Claude,
     Codex,
     Cursor,
+    Antigravity,
 }
 
 impl ProviderId {
-    pub const ALL: [ProviderId; 3] = [ProviderId::Claude, ProviderId::Codex, ProviderId::Cursor];
+    pub const ALL: [ProviderId; 4] =
+        [ProviderId::Claude, ProviderId::Codex, ProviderId::Cursor, ProviderId::Antigravity];
 
     pub fn as_str(self) -> &'static str {
         match self {
             ProviderId::Claude => "claude",
             ProviderId::Codex => "codex",
             ProviderId::Cursor => "cursor",
+            ProviderId::Antigravity => "antigravity",
         }
     }
 
@@ -33,6 +36,7 @@ impl ProviderId {
             ProviderId::Claude => "Claude",
             ProviderId::Codex => "Codex",
             ProviderId::Cursor => "Cursor",
+            ProviderId::Antigravity => "Antigravity",
         }
     }
 
@@ -42,6 +46,7 @@ impl ProviderId {
             ProviderId::Claude => "claude auth login",
             ProviderId::Codex => "codex login",
             ProviderId::Cursor => "cursor-agent login",
+            ProviderId::Antigravity => "agy",
         }
     }
 }

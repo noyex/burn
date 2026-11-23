@@ -152,7 +152,7 @@ impl Settings {
 fn default_window(p: ProviderId) -> &'static str {
     match p {
         // The 5-hour window is the one that actually blocks work during the day.
-        ProviderId::Claude => "5h",
+        ProviderId::Claude | ProviderId::Antigravity => "5h",
         // Cursor's API bucket often sits at 100% while the plan as a whole is fine.
         ProviderId::Cursor => "total",
         ProviderId::Codex => HIGHEST,
@@ -208,7 +208,10 @@ mod tests {
         s.normalize();
         assert!(!s.shows_spending);
         assert_eq!(s.shelf_retention_days, 7);
-        assert_eq!(s.provider_order, vec![ProviderId::Cursor, ProviderId::Claude, ProviderId::Codex]);
+        assert_eq!(
+            s.provider_order,
+            vec![ProviderId::Cursor, ProviderId::Claude, ProviderId::Codex, ProviderId::Antigravity]
+        );
         assert_eq!(s.widget_window(ProviderId::Claude), "5h");
         let mut both = s.clone();
         both.widget_windows.insert(ProviderId::Claude, "5h, week".into());

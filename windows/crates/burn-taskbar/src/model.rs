@@ -6,6 +6,7 @@ pub enum Provider {
     Claude,
     Codex,
     Cursor,
+    Antigravity,
 }
 
 impl Provider {
@@ -14,6 +15,7 @@ impl Provider {
             Provider::Claude => "Claude",
             Provider::Codex => "Codex",
             Provider::Cursor => "Cursor",
+            Provider::Antigravity => "Antigravity",
         }
     }
 }

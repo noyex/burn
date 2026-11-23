@@ -26,6 +26,7 @@ const FONT_DISPLAY: &[u8] = include_bytes!("../../../../assets/Fonts/BricolageGr
 const GLYPH_CLAUDE: &str = include_str!("../../burn-taskbar/assets/claude.svg");
 const GLYPH_OPENAI: &str = include_str!("../../burn-taskbar/assets/openai.svg");
 const GLYPH_CURSOR: &str = include_str!("../../burn-taskbar/assets/cursor.svg");
+const GLYPH_ANTIGRAVITY: &str = include_str!("../../burn-taskbar/assets/antigravity.svg");
 
 /// Family names inside the font files (checked by a test).
 const TEXT: &str = "Bricolage Grotesque 12pt";
@@ -203,6 +204,7 @@ fn card_colors(theme: &ResolvedTheme, p: ProviderId) -> Card {
         ProviderId::Claude => (Token::Coral, Token::CoralInk),
         ProviderId::Codex => (Token::Mono, Token::MonoInk),
         ProviderId::Cursor => (Token::Lavender, Token::LavenderInk),
+        ProviderId::Antigravity => (Token::Sky, Token::SkyInk),
     };
     Card { slot, fill: light(theme, slot), ink: light(theme, ink) }
 }
@@ -224,6 +226,7 @@ fn glyph_path(p: ProviderId) -> &'static str {
         ProviderId::Claude => GLYPH_CLAUDE,
         ProviderId::Codex => GLYPH_OPENAI,
         ProviderId::Cursor => GLYPH_CURSOR,
+        ProviderId::Antigravity => GLYPH_ANTIGRAVITY,
     };
     let start = src.find(" d=\"").map(|i| i + 4).unwrap_or(0);
     let end = src[start..].find('"').map(|i| start + i).unwrap_or(start);
@@ -320,8 +323,12 @@ fn flame(out: &mut String, x: f32, y: f32, size: f32, fill: Rgba) {
 }
 
 fn bars(out: &mut String, usage: &UsageSummary, x: f32, y: f32, w: f32, h: f32, ink: Rgba) {
-    const SHADES: [(ProviderId, f32); 3] =
-        [(ProviderId::Claude, 1.0), (ProviderId::Codex, 0.45), (ProviderId::Cursor, 0.25)];
+    const SHADES: [(ProviderId, f32); 4] = [
+        (ProviderId::Claude, 1.0),
+        (ProviderId::Antigravity, 0.7),
+        (ProviderId::Codex, 0.45),
+        (ProviderId::Cursor, 0.25),
+    ];
     let buckets: &[UsageBucket] = &usage.buckets;
     if buckets.is_empty() {
         return;

@@ -6,12 +6,12 @@ use std::path::Path;
 use std::time::Duration;
 
 /// Bump whenever parsing, ids or pricing semantics change: the importer drops and rebuilds `usage` and `files`.
-pub const SCHEMA_VERSION: &str = "2";
+pub const SCHEMA_VERSION: &str = "3";
 
 pub const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS usage (
-  id          TEXT PRIMARY KEY,   -- claude: msg_id:req_id; codex: session:ts:model:tokens#occurrence (T3's dedupe identity)
-  provider    TEXT NOT NULL,      -- claude | codex
+  id          TEXT PRIMARY KEY,   -- claude: msg_id:req_id; codex: session:ts:model:tokens#occurrence; antigravity: antigravity:field:id
+  provider    TEXT NOT NULL,      -- claude | codex | antigravity
   model       TEXT,
   ts_ms       INTEGER NOT NULL,
   ts          TEXT NOT NULL,      -- local time, ISO

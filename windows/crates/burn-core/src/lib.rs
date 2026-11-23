@@ -1,6 +1,7 @@
 //! Burn's data layer for Windows: provider limits, usage import from local session logs and
 //! API-price costs. A port of the Mac app's `Sources/Burn/Data`; per-record results must match it.
 
+pub mod antigravity;
 pub mod database;
 pub mod importer;
 pub mod limits;

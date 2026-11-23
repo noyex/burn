@@ -26,8 +26,8 @@ describe("panel layout", () => {
   });
 
   it("closest to limit sorts by remaining", () => {
-    const remaining: Record<ProviderId, number> = { claude: 40, codex: 80, cursor: 40 };
-    expect(closestToLimit(all, (p) => remaining[p])).toEqual(["claude", "cursor", "codex"]);
+    const remaining: Partial<Record<ProviderId, number>> = { claude: 40, codex: 80, cursor: 40 };
+    expect(closestToLimit(all, (p) => remaining[p] ?? null)).toEqual(["claude", "cursor", "codex"]);
     expect(closestToLimit(all, (p) => (p === "cursor" ? 10 : null))).toEqual(["cursor", "claude", "codex"]);
   });
 
@@ -37,6 +37,6 @@ describe("panel layout", () => {
   });
 
   it("saved order is repaired", () => {
-    expect(order(["cursor", "nope", "cursor"])).toEqual(["cursor", "claude", "codex"]);
+    expect(order(["cursor", "nope", "cursor"])).toEqual(["cursor", "claude", "codex", "antigravity"]);
   });
 });
