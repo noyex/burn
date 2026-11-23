@@ -39,6 +39,9 @@ struct LimitWindow: Identifiable, Hashable, Sendable {
 }
 
 extension LimitWindow {
+    /// Share still left, 0...100.
+    var left: Int { Int(min(max(100 - percent, 0), 100).rounded()) }
+
     /// The small windows a card lists next to `primary`. A hidden one still shows once it is used
     /// up, so the card explains why work stopped.
     static func cardSecondaries(_ windows: [LimitWindow], primary: LimitWindow, hidden: Set<String>) -> [LimitWindow] {

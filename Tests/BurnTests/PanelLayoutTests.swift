@@ -5,6 +5,13 @@ struct PanelLayoutTests {
     private let all: [ProviderID] = [.claude, .codex, .cursor]
     private let custom: (ProviderID) -> CardSize = { $0 == .claude ? .l : .m }
 
+    @Test func dashboardTilesPairUp() {
+        #expect(DashboardView.rows([]) == [])
+        #expect(DashboardView.rows([.claude]) == [[.claude]])
+        #expect(DashboardView.rows(all) == [[.claude, .codex], [.cursor]])
+        #expect(DashboardView.rows(all + [.antigravity]) == [[.claude, .codex], [.cursor, .antigravity]])
+    }
+
     @Test func autoSizesByCount() {
         #expect(PanelLayout.auto.sizes(for: [.codex], custom: custom) == [.codex: .l])
         #expect(PanelLayout.auto.sizes(for: [.codex, .cursor], custom: custom) == [.codex: .m, .cursor: .m])

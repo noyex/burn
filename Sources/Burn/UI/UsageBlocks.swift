@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Limits
 
 /// Remaining share of a window, 0...100.
-private func remaining(_ w: LimitWindow) -> Int { Int(min(max(100 - w.percent, 0), 100).rounded()) }
+private func remaining(_ w: LimitWindow) -> Int { w.left }
 
 /// "66%" with a smaller percent sign.
 struct BigPercent: View {
@@ -248,7 +248,7 @@ struct ProviderBlock: View {
 }
 
 /// Thin bar of what's left in a window.
-private struct RemainingBar: View {
+struct RemainingBar: View {
     let fraction: Double
     let ink: Color
 
@@ -290,6 +290,27 @@ struct ProviderIssueRow: View {
         }
         .frame(minHeight: 26)
         .block(.neutral, padding: 10)
+    }
+}
+
+/// Shown before any provider is signed in.
+struct SignInBlock: View {
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let theme = Theme(scheme)
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Sign in to a provider in Terminal:")
+                .font(.brand(12))
+                .foregroundStyle(theme.secondary)
+            ForEach(ProviderID.allCases) { p in
+                HStack(spacing: 8) {
+                    ProviderGlyph(provider: p, color: theme.text)
+                    CommandChip(command: p.loginCommand)
+                }
+            }
+        }
+        .block(.neutral)
     }
 }
 

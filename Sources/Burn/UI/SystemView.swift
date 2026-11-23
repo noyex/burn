@@ -281,7 +281,7 @@ struct SystemView: View {
 }
 
 /// A big number with a smaller unit after it: "182 GB free".
-private struct BigValue: View {
+struct BigValue: View {
     let number: String
     let unit: String
     let size: CGFloat

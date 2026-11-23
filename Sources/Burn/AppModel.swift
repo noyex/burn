@@ -148,9 +148,14 @@ final class AppModel {
         }
     }
 
-    /// Connected providers shown in the panel, in order.
+    /// Every connected provider, in order: the Usage tab shows them all.
     var panelProviders: [ProviderID] {
-        orderedProviders.filter { connected.contains($0) && settings.showsInPanel($0) }
+        orderedProviders.filter { connected.contains($0) }
+    }
+
+    /// Connected providers the user put on the dashboard, in order.
+    var dashboardProviders: [ProviderID] {
+        panelProviders.filter { settings.showsOnDashboard($0) }
     }
 
     /// Shown providers that get a card; the rest get a compact row about signing in or the error.

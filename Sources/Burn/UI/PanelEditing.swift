@@ -69,9 +69,9 @@ extension View {
         background(RightClickCatcher(action: action))
     }
 
-    /// The remove button and, for provider cards, the size switch shown on a card while editing.
-    func editChrome(_ editing: Bool, title: String, size: Binding<CardSize>?, onRemove: @escaping () -> Void) -> some View {
-        modifier(EditChrome(editing: editing, title: title, size: size, onRemove: onRemove))
+    /// The size switch shown on a provider card while editing.
+    func editChrome(_ editing: Bool, title: String, size: Binding<CardSize>) -> some View {
+        modifier(EditChrome(editing: editing, title: title, size: size))
     }
 }
 
@@ -128,32 +128,14 @@ final class RightClickView: NSView {
 private struct EditChrome: ViewModifier {
     let editing: Bool
     let title: String
-    let size: Binding<CardSize>?
-    let onRemove: () -> Void
+    let size: Binding<CardSize>
     @Environment(\.colorScheme) private var scheme
 
     func body(content: Content) -> some View {
         let theme = Theme(scheme)
         content
-            .overlay(alignment: .topLeading) {
-                if editing {
-                    Button(action: onRemove) {
-                        Image(systemName: "minus")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(theme.text)
-                            .frame(width: 20, height: 20)
-                            .floating(theme.surface, in: Bento.pill)
-                            .contentShape(Bento.pill)
-                    }
-                    .buttonStyle(PressStyle())
-                    .offset(x: -6, y: -6)
-                    .hoverTip("Hide \(title)")
-                    .accessibilityLabel("Hide \(title)")
-                    .transition(.opacity.combined(with: .scale(scale: 0.6)))
-                }
-            }
             .overlay(alignment: .bottomTrailing) {
-                if editing, let size {
+                if editing {
                     PillSegmented(options: CardSize.allCases, selection: size,
                                   style: .init(track: theme.surface, selected: theme.text,
                                                selectedText: theme.base, text: theme.secondary),
