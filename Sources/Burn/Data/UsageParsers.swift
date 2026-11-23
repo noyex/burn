@@ -349,7 +349,7 @@ func makeRows(_ records: [UsageRecord], path: String, origin: String, project: S
                 id = "\(key)#\(n)"
             }
         } else {
-            id = r.dedupeKey ?? "claude:\(path)#\(i)"
+            id = r.dedupeKey ?? "\(r.provider):\(path)#\(i)"
         }
         rows.append(UsageRow(record: r, id: id, project: project, origin: origin, source: path, rates: rates))
     }
@@ -375,14 +375,14 @@ func t3CacheVersion(_ name: String) -> Int {
 /// Decodes T3's usage-scan-cache*.json (`decodeScanCache`). Entries that fail validation are skipped, like T3 does.
 func parseT3Cache(path: String) throws -> [T3CacheFile] {
     guard let d = try JSONSerialization.jsonObject(with: readFile(path)) as? [String: Any],
-          let version = num(d["version"]), version >= 4, version <= 7,
+          let version = num(d["version"]), version >= 4, version <= 17,
           let models = d["models"] as? [String], let sessions = d["sessions"] as? [String],
           let files = d["files"] as? [String: Any] else { return [] }
 
     func decode(_ rows: [Any], _ provider: String, _ src: String) -> [UsageRecord]? {
         var out: [UsageRecord] = []
         for case let r as [Any] in rows {
-            // [ts_ms, model, session, uncached, cached, cacheCreation, output, reasoning, dedupeKey, reportedCost, speed, rateModel, tierTurn?]
+            // [ts_ms, model, session, uncached, cached, cacheCreation, output, reasoning, dedupeKey, reportedCost, speed, rateModel, tierTurn?, cacheCreation1h?]
             guard r.count >= 11, let ts = num(r[0]).flatMap(toInt64), let mi = num(r[1]).flatMap(toInt), mi >= 0, mi < models.count,
                   let u = num(r[3]).flatMap(toInt64), let c = num(r[4]).flatMap(toInt64), let w = num(r[5]).flatMap(toInt64),
                   let o = num(r[6]).flatMap(toInt64), let re = num(r[7]).flatMap(toInt64),
@@ -393,7 +393,7 @@ func parseT3Cache(path: String) throws -> [T3CacheFile] {
                 rateModel = models[ri]
             }
             var tier: String?
-            if version >= 7, r.count > 12 {
+            if version >= 7, r.count > 12, !(r[12] is NSNull) {
                 guard let t = r[12] as? String else { return nil }
                 tier = t
             }
@@ -412,7 +412,8 @@ func parseT3Cache(path: String) throws -> [T3CacheFile] {
 
     var out: [T3CacheFile] = []
     for (src, e) in files {
-        guard let entry = e as? [String: Any], let provider = str(entry["p"]), provider == "claude" || provider == "codex",
+        guard let entry = e as? [String: Any], let provider = str(entry["p"]),
+              provider == "claude" || provider == "codex" || provider == "antigravity",
               num(entry["s"]) != nil, num(entry["m"]) != nil,
               let r = entry["r"] as? [Any], let t = entry["t"] as? [Any],
               let rec = decode(r, provider, src), let tail = decode(t, provider, src) else { continue }

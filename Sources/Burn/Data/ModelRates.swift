@@ -74,7 +74,7 @@ struct ModelRates: Sendable {
 
     /// Anthropic list prices for models LiteLLM doesn't list yet; the table wins once it has them.
     /// Bump `builtinVersion` on every change so stored costs get recomputed.
-    static let builtinVersion = "1"
+    static let builtinVersion = "2"
     static let builtin: [String: ModelRate] = {
         func rate(_ input: Double, _ output: Double, cacheRead: Double, fast: Double?) -> ModelRate {
             // Cache writes (5 min) cost 1.25x input.
@@ -123,7 +123,11 @@ struct ModelRates: Sendable {
                           cacheCreation: cache("cache_creation_input_token_cost", \.cacheCreation))
     }
 
-    /// `parseRateTable` (LiteLLM document -> normalized-name table, plus unambiguous bare-name aliases).
+    private static let firstPartyProviders: Set<String> = [
+        "anthropic", "deepseek", "gemini", "meta", "mistral", "openai", "xai",
+    ]
+
+    /// `parseRateTable` (LiteLLM document -> normalized-name table, plus bare-name aliases preferring first-party).
     static func parseTable(_ document: [String: Any]) -> [String: ModelRate] {
         var table: [String: ModelRate] = [:]
         table.reserveCapacity(document.count)
@@ -140,17 +144,22 @@ struct ModelRates: Sendable {
                 fast: multiple.map { standard.scaled(by: $0) } ?? readTokenRates(e, "_priority", standard: standard),
                 ultrafast: readTokenRates(e, "_ultrafast", standard: standard))
         }
-        var candidates: [String: ModelRate?] = [:]
+        var candidates: [String: (rate: ModelRate?, firstParty: Bool)] = [:]
         for (key, rate) in table {
             let alias = bareName(key)
             if alias.isEmpty || alias == key || table[alias] != nil { continue }
+            let firstParty = key.firstIndex(of: "/").map { firstPartyProviders.contains(String(key[..<$0])) } ?? false
             if let held = candidates[alias] {
-                if let h = held, h != rate { candidates[alias] = .some(nil) }
+                if firstParty && !held.firstParty {
+                    candidates[alias] = (rate, true)
+                } else if firstParty == held.firstParty, let h = held.rate, h != rate {
+                    candidates[alias] = (nil, firstParty)
+                }
             } else {
-                candidates[alias] = .some(rate)
+                candidates[alias] = (rate, firstParty)
             }
         }
-        for (alias, rate) in candidates { if let rate { table[alias] = rate } }
+        for (alias, entry) in candidates { if let rate = entry.rate { table[alias] = rate } }
         return table
     }
 

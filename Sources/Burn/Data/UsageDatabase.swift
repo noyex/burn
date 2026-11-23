@@ -93,7 +93,7 @@ final class UsageDatabase: Sendable {
         let sql = "SELECT ts_ms, provider, cost_usd, input + cache_read + cache_write + output FROM usage WHERE ts_ms >= ? AND ts_ms < ?"
         try query(db, sql, binds: [startsMs[0], Int64(end.timeIntervalSince1970 * 1000)]) { stmt in
             guard let c = sqlite3_column_text(stmt, 1), let p = ProviderID(rawValue: String(cString: c)),
-                  p == .claude || p == .codex else { return }
+                  p != .cursor else { return }
             let ts = sqlite3_column_int64(stmt, 0)
             let cost = sqlite3_column_double(stmt, 2)
             // Last bucket whose start <= ts.

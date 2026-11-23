@@ -11,6 +11,7 @@ enum ProviderIcon {
         case .claude: ProviderLogoSVG.claude
         case .codex: ProviderLogoSVG.openai
         case .cursor: ProviderLogoSVG.cursor
+        case .antigravity: ProviderLogoSVG.antigravity
         }
         let img = NSImage(data: Data(svg.utf8)) ?? NSImage()
         img.isTemplate = true

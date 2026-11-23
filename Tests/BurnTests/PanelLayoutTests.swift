@@ -36,6 +36,6 @@ struct PanelLayoutTests {
     }
 
     @Test func savedOrderIsRepaired() {
-        #expect(PanelArrangement.order(from: ["cursor", "nope", "cursor"]) == [.cursor, .claude, .codex])
+        #expect(PanelArrangement.order(from: ["cursor", "nope", "cursor"]) == [.cursor, .claude, .codex, .antigravity])
     }
 }

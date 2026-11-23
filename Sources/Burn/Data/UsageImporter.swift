@@ -16,7 +16,7 @@ actor UsageImporter {
         let size: Int64
         let mtime: Double
         let kind: Kind
-        enum Kind: Sendable { case claude, codex }
+        enum Kind: Sendable { case claude, codex, antigravity }
     }
 
     private struct Parsed: Sendable {
@@ -48,7 +48,9 @@ actor UsageImporter {
         let rates = await ModelRates.load()
         let known = try knownFiles(conn)
         let home = NSHomeDirectory()
-        let all = Self.discover(home + "/.claude/projects", kind: .claude) + Self.discover(home + "/.codex/sessions", kind: .codex)
+        let all = Self.discover(home + "/.claude/projects", kind: .claude)
+            + Self.discover(home + "/.codex/sessions", kind: .codex)
+            + Self.discoverAntigravity(home: home)
         let jobs = all.filter { j in known[j.path].map { $0 != (j.size, j.mtime) } ?? true }
         let caches = Self.t3Caches(in: home + "/.t3/userdata")
         let total = jobs.count + caches.count
@@ -69,8 +71,11 @@ actor UsageImporter {
             func spawn() {
                 guard let job = iterator.next() else { return }
                 group.addTask {
-                    let records = job.kind == .claude ? try? parseClaudeRecords(path: job.path)
-                                                      : try? parseCodexRecords(path: job.path)
+                    let records: [UsageRecord]? = switch job.kind {
+                    case .claude: try? parseClaudeRecords(path: job.path)
+                    case .codex: try? parseCodexRecords(path: job.path)
+                    case .antigravity: try? AntigravityUsage.parseDatabase(path: job.path)
+                    }
                     let project = job.kind == .claude ? URL(fileURLWithPath: job.path).deletingLastPathComponent().lastPathComponent : nil
                     return Parsed(job: job, rows: records.map { makeRows($0, path: job.path, origin: "log", project: project, rates: rates) })
                 }
@@ -266,6 +271,23 @@ actor UsageImporter {
         for case let url as URL in e where url.pathExtension == "jsonl" {
             guard let (size, mtime) = fileStat(url.path) else { continue }
             out.append(Job(path: url.path, size: size, mtime: mtime, kind: kind))
+        }
+        return out
+    }
+
+    /// Antigravity conversation `.db` files; fingerprint includes `-wal` so live turns trigger re-import.
+    private static func discoverAntigravity(home: String) -> [Job] {
+        var seen = Set<String>()
+        var out: [Job] = []
+        for dir in AntigravityUsage.conversationDirectories(home: home) {
+            guard let e = FileManager.default.enumerator(at: URL(fileURLWithPath: dir), includingPropertiesForKeys: [.isSymbolicLinkKey]) else { continue }
+            for case let url as URL in e where url.pathExtension == "db" {
+                if (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true { continue }
+                let canonical = url.resolvingSymlinksInPath().path
+                guard seen.insert(canonical).inserted, let (size, mtime) = fileStat(canonical) else { continue }
+                let wal = fileStat(canonical + "-wal")
+                out.append(Job(path: canonical, size: size + (wal?.0 ?? 0), mtime: max(mtime, wal?.1 ?? 0), kind: .antigravity))
+            }
         }
         return out
     }

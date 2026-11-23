@@ -105,7 +105,7 @@ final class Settings {
     private static func defaultWindow(_ p: ProviderID) -> String {
         switch p {
         // The 5-hour window is the one that actually blocks work during the day.
-        case .claude: "5h"
+        case .claude, .antigravity: "5h"
         // Cursor's API bucket often sits at 100% while the plan as a whole is fine.
         case .cursor: "total"
         default: highest

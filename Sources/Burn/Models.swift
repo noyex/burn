@@ -1,7 +1,7 @@
 import Foundation
 
 enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
-    case claude, codex, cursor
+    case claude, codex, cursor, antigravity
 
     var id: String { rawValue }
 
@@ -10,6 +10,7 @@ enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .claude: "Claude"
         case .codex: "Codex"
         case .cursor: "Cursor"
+        case .antigravity: "Antigravity"
         }
     }
 
@@ -19,6 +20,7 @@ enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .claude: "claude auth login"
         case .codex: "codex login"
         case .cursor: "cursor-agent login"
+        case .antigravity: "agy"
         }
     }
 }

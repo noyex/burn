@@ -233,7 +233,7 @@ struct PopoverView: View {
             SpendBlock(model: model)
         } else if let pct = model.importPercent {
             ProgressView(value: Double(pct), total: 100) {
-                Text("Importing usage from Claude Code and Codex logs…").font(.brand(11))
+                Text("Importing usage from local session logs…").font(.brand(11))
             }
             .tint(theme.accentInk)
             .controlSize(.small)

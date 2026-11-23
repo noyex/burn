@@ -402,7 +402,7 @@ struct SpendBars: View {
         _grown = State(initialValue: !animated)
     }
 
-    private static let shades: [ProviderID: Double] = [.claude: 1, .codex: 0.45, .cursor: 0.25]
+    private static let shades: [ProviderID: Double] = [.claude: 1, .antigravity: 0.7, .codex: 0.45, .cursor: 0.25]
 
     var body: some View {
         GeometryReader { geo in

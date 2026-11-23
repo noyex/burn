@@ -50,7 +50,7 @@ final class AppModel {
     @ObservationIgnored var onMenuBarChange: (() -> Void)?
 
     @ObservationIgnored private let fetchers: [any LimitsFetcher] = [
-        ClaudeLimitsFetcher(), CodexLimitsFetcher(), CursorLimitsFetcher(),
+        ClaudeLimitsFetcher(), CodexLimitsFetcher(), CursorLimitsFetcher(), AntigravityLimitsFetcher(),
     ]
     @ObservationIgnored private let db = UsageDatabase()
     @ObservationIgnored private var limitsFetchedAt: Date?
