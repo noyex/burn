@@ -33,6 +33,7 @@ final class Settings {
     private var cardSizes: [String: String]
     private var cardColors: [String: String]
     private var cardWindows: [String: String]
+    private var hiddenCardWindows: [String: [String]]
     private(set) var launchAtLogin: Bool
     /// Every provider, in the manual order of the panel.
     private(set) var providerOrder: [ProviderID]
@@ -78,6 +79,7 @@ final class Settings {
         hiddenInPanel = Set(defaults.stringArray(forKey: "panel.hidden") ?? [])
         cardSizes = defaults.dictionary(forKey: "panel.sizes") as? [String: String] ?? [:]
         cardColors = defaults.dictionary(forKey: "panel.colors") as? [String: String] ?? [:]
+        hiddenCardWindows = defaults.dictionary(forKey: "panel.hiddenWindows") as? [String: [String]] ?? [:]
         if let saved = defaults.dictionary(forKey: "panel.windows") as? [String: String] {
             cardWindows = saved
         } else {
@@ -156,6 +158,16 @@ final class Settings {
     func setCardWindow(_ p: ProviderID, _ id: String) {
         cardWindows[p.rawValue] = id
         defaults.set(cardWindows, forKey: "panel.windows")
+    }
+
+    /// Windows the user switched off on the card. Stored as hidden, so windows a provider adds later show up.
+    func hiddenCardWindows(_ p: ProviderID) -> Set<String> { Set(hiddenCardWindows[p.rawValue] ?? []) }
+
+    func setShowsCardWindow(_ p: ProviderID, _ id: String, _ on: Bool) {
+        var set = hiddenCardWindows(p)
+        if on { set.remove(id) } else { set.insert(id) }
+        hiddenCardWindows[p.rawValue] = set.isEmpty ? nil : set.sorted()
+        defaults.set(hiddenCardWindows, forKey: "panel.hiddenWindows")
     }
 
     /// Takes `shown` as the new order of those providers and switches to manual order, so a

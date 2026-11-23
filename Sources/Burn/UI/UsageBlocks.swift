@@ -31,6 +31,8 @@ struct ProviderBlock: View {
     let primary: LimitWindow?
     let size: CardSize
     let color: CardColor
+    /// Window ids the user switched off on the card.
+    var hidden: Set<String> = []
 
     @Environment(\.colorScheme) private var scheme
 
@@ -58,7 +60,7 @@ struct ProviderBlock: View {
 
     @ViewBuilder
     private func content(_ limits: ProviderLimits, primary: LimitWindow) -> some View {
-        let others = limits.windows.filter { $0.id != primary.id }
+        let others = LimitWindow.cardSecondaries(limits.windows, primary: primary, hidden: hidden)
         switch size {
         case .s:
             compact(limits, primary: primary)

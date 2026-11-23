@@ -38,4 +38,15 @@ struct PanelLayoutTests {
     @Test func savedOrderIsRepaired() {
         #expect(PanelArrangement.order(from: ["cursor", "nope", "cursor"]) == [.cursor, .claude, .codex, .antigravity])
     }
+
+    @Test func hiddenCardWindowsShowOnlyWhenUsedUp() {
+        let primary = LimitWindow(id: "5h", label: "5h", percent: 20, resetsAt: nil)
+        let windows = [primary,
+                       LimitWindow(id: "week", label: "Week", percent: 99.6, resetsAt: nil),
+                       LimitWindow(id: "3p-5h", label: "3P 5h", percent: 0, resetsAt: nil, minor: true),
+                       LimitWindow(id: "argon", label: "Argon", percent: 0, resetsAt: nil, minor: true)]
+        let shown = LimitWindow.cardSecondaries(windows, primary: primary, hidden: ["week", "3p-5h"])
+        #expect(shown.map(\.id) == ["week", "argon"])
+        #expect(LimitWindow.cardSecondaries(windows, primary: primary, hidden: []).count == 3)
+    }
 }

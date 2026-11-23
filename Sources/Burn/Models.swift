@@ -38,6 +38,16 @@ struct LimitWindow: Identifiable, Hashable, Sendable {
     var minor = false
 }
 
+extension LimitWindow {
+    /// The small windows a card lists next to `primary`. A hidden one still shows once it is used
+    /// up, so the card explains why work stopped.
+    static func cardSecondaries(_ windows: [LimitWindow], primary: LimitWindow, hidden: Set<String>) -> [LimitWindow] {
+        windows.filter { w in
+            w.id != primary.id && (!hidden.contains(w.id) || min(max(100 - w.percent, 0), 100).rounded() <= 0)
+        }
+    }
+}
+
 struct ProviderLimits: Sendable {
     let provider: ProviderID
     /// Human-readable plan, e.g. "Max 5x", "Pro", "Free". Nil if unknown.

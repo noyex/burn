@@ -59,6 +59,8 @@ struct ProviderSettingsView: View {
                     .padding(.horizontal, 4)
             }
 
+            cardWindowsGroup
+
             SettingsSectionTitle("ACCOUNT")
             SettingsGroup {
                 HStack {
@@ -123,6 +125,34 @@ struct ProviderSettingsView: View {
                 .controlSize(.small)
             }
             .frame(height: 32)
+        }
+    }
+
+    /// One switch per small window on the card; the main number is always shown.
+    @ViewBuilder
+    private var cardWindowsGroup: some View {
+        let p = provider
+        let limits = model.limits[p]?.limits
+        let primary = limits.flatMap { model.cardWindow(for: $0) }
+        let others = (limits?.windows ?? []).filter { $0.id != primary?.id }
+        if !others.isEmpty {
+            SettingsSectionTitle("ALSO ON THE CARD")
+            SettingsGroup {
+                ForEach(Array(others.enumerated()), id: \.element.id) { i, w in
+                    if i > 0 { Divider().opacity(0.6) }
+                    HStack {
+                        Text(w.label)
+                        Spacer()
+                        Toggle(w.label, isOn: Binding(
+                            get: { !model.settings.hiddenCardWindows(p).contains(w.id) },
+                            set: { on in withAnimation(.snappy(duration: 0.25)) { model.settings.setShowsCardWindow(p, w.id, on) } }))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
+                    .frame(height: 32)
+                }
+            }
         }
     }
 
