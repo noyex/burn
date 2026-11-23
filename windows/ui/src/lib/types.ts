@@ -71,6 +71,8 @@ export interface Settings {
   cardSizes: Partial<Record<ProviderId, CardSize>>;
   cardColors: Partial<Record<ProviderId, CardColor>>;
   cardWindows: Partial<Record<ProviderId, string>>;
+  /** Small windows switched off on each card. */
+  hiddenCardWindows: Partial<Record<ProviderId, string[]>>;
   providerOrder: ProviderId[];
   panelLayout: PanelLayout;
   panelOrder: PanelOrder;

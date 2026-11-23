@@ -13,6 +13,7 @@ const settings: Settings = {
   cardSizes: {},
   cardColors: {},
   cardWindows: {},
+  hiddenCardWindows: {},
   providerOrder: ["claude", "codex", "cursor", "antigravity"],
   panelLayout: "custom",
   panelOrder: "manual",

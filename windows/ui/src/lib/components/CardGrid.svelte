@@ -7,6 +7,7 @@
   import { reducedMotion } from "../motion";
   import { holdToEdit } from "../press";
   import { BRAND } from "../level";
+  import { hiddenCardWindows } from "../settings";
   import { PROVIDERS, PROVIDER_NAME, limitsOf, type CardSize, type ProviderId, type Snapshot } from "../types";
   import EditChrome from "./EditChrome.svelte";
   import ProviderBlock from "./ProviderBlock.svelte";
@@ -120,6 +121,7 @@
     primary={limits ? cardWindow(snap, limits) : null}
     size={sizeOf.get(p) ?? "m"}
     color={snap.settings.cardColors[p] ?? BRAND[p]}
+    hidden={hiddenCardWindows(snap.settings, p)}
   />
 {/snippet}
 

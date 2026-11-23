@@ -67,6 +67,8 @@ pub struct Settings {
     pub card_colors: BTreeMap<ProviderId, CardColor>,
     /// Window shown big on each card, or `highest`. Separate from the widget choice.
     pub card_windows: BTreeMap<ProviderId, String>,
+    /// Small windows switched off on each card. Stored as hidden, so windows a provider adds later show up.
+    pub hidden_card_windows: BTreeMap<ProviderId, Vec<String>>,
     /// Every provider, in the manual order of the panel.
     pub provider_order: Vec<ProviderId>,
     pub panel_layout: PanelLayout,
@@ -89,6 +91,7 @@ impl Default for Settings {
             card_sizes: BTreeMap::new(),
             card_colors: BTreeMap::new(),
             card_windows: BTreeMap::new(),
+            hidden_card_windows: BTreeMap::new(),
             provider_order: ProviderId::ALL.to_vec(),
             panel_layout: PanelLayout::Custom,
             panel_order: PanelOrder::Manual,

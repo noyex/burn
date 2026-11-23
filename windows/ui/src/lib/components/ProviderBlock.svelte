@@ -6,6 +6,7 @@
 <script lang="ts">
   import { clock } from "../clock.svelte";
   import { remaining, reset, resetsSoon } from "../format";
+  import { cardSecondaries } from "../layout";
   import { alertColor, level } from "../level";
   import { theme } from "../theme.svelte";
   import { tip } from "../tip.svelte";
@@ -22,10 +23,11 @@
     primary,
     size,
     color,
-  }: { provider: ProviderId; state: LimitState; primary: LimitWindow | null; size: CardSize; color: CardColor } = $props();
+    hidden = [],
+  }: { provider: ProviderId; state: LimitState; primary: LimitWindow | null; size: CardSize; color: CardColor; hidden?: string[] } = $props();
 
   const limits = $derived(limitsOf(state));
-  const others = $derived(limits && primary ? limits.windows.filter((w) => w.id !== primary.id) : []);
+  const others = $derived(limits && primary ? cardSecondaries(limits.windows, primary, hidden) : []);
   const hero = $derived(size === "l");
   const name = $derived(PROVIDER_NAME[provider]);
   const primaryLevel = $derived(primary ? level(primary.percent) : "normal");

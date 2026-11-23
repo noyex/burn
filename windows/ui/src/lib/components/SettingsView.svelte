@@ -1,14 +1,16 @@
 <!-- Settings (SettingsView.swift, ProviderSettingsView.swift): the panel's options, one page per provider, and the theme page. -->
 <script lang="ts">
-  import { cardProviders, customSizeOf, orderedProviders, sizes } from "../layout";
+  import { cardProviders, cardWindow, customSizeOf, orderedProviders, sizes } from "../layout";
   import {
     cardWindowId,
+    hiddenCardWindows,
     setCardColor,
     setCardSize,
     setCardWindow,
     setPanelLayout,
     setPanelOrder,
     setShelfRetentionDays,
+    setShowsCardWindow,
     setShowsInPanel,
     setShowsInWidget,
     setShowsSpending,
@@ -157,6 +159,20 @@
     </div>
     {#if s.panelLayout !== "custom"}
       <p class="note">Changing a size switches the panel to the Custom layout.</p>
+    {/if}
+
+    {@const lim = limitsOf(snap.limits[p])}
+    {@const shownMain = lim ? cardWindow(snap, lim) : null}
+    {@const extra = windowsOf(p).filter((w) => w.id !== shownMain?.id)}
+    {#if extra.length}
+      {@render title("Also on the card")}
+      <div class="group">
+        {#each extra as w (w.id)}
+          <div class="item">
+            <ToggleRow label={w.label} checked={!hiddenCardWindows(s, p).includes(w.id)} onChange={(on) => commit(setShowsCardWindow(s, p, w.id, on))} />
+          </div>
+        {/each}
+      </div>
     {/if}
 
     {@render title("Account")}
