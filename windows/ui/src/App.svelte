@@ -279,7 +279,7 @@
           {:else}
             <div class="block importing">
               <BlockArt fill="accent" />
-              <span>Importing usage from Claude Code and Codex logs…</span>
+              <span>Importing usage from local session logs…</span>
               <div class="progress"><div style:width="{snap.importPercent ?? 0}%"></div></div>
             </div>
           {/if}

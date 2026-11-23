@@ -33,6 +33,7 @@ pub struct ImportResult {
 enum Kind {
     Claude,
     Codex,
+    Antigravity,
 }
 
 #[derive(Clone, Debug)]
@@ -87,6 +88,7 @@ pub fn run_with_rates(
     let known = known_files(&conn)?;
     let mut all = discover(&paths.claude_projects(), Kind::Claude);
     all.extend(discover(&paths.codex_sessions(), Kind::Codex));
+    all.extend(discover_antigravity(paths));
     let jobs: Vec<Job> = all.iter().filter(|j| known.get(&j.key) != Some(&(j.size, j.mtime))).cloned().collect();
     let caches = t3_caches(&paths.t3_userdata());
     let total = jobs.len() + caches.len();
@@ -202,13 +204,13 @@ fn import_files(
 
 fn parse_job(job: &Job, rates: &ModelRates) -> Option<Vec<UsageRow>> {
     let records = match job.kind {
-        Kind::Claude => parsers::parse_claude_records(&job.path),
-        Kind::Codex => parsers::parse_codex_records(&job.path),
-    }
-    .ok()?;
+        Kind::Claude => parsers::parse_claude_records(&job.path).ok()?,
+        Kind::Codex => parsers::parse_codex_records(&job.path).ok()?,
+        Kind::Antigravity => crate::antigravity::parse_database(&job.path)?,
+    };
     let project = match job.kind {
         Kind::Claude => parent_name(&job.key),
-        Kind::Codex => None,
+        Kind::Codex | Kind::Antigravity => None,
     };
     Some(parsers::make_rows(&records, &job.key, "log", project.as_deref(), rates))
 }
@@ -457,6 +459,45 @@ fn discover(root: &Path, kind: Kind) -> Vec<Job> {
                 && let Some((size, mtime)) = file_stat(&path)
             {
                 out.push(Job { key: path.to_string_lossy().into_owned(), path, size, mtime, kind });
+            }
+        }
+    }
+    out
+}
+
+/// Antigravity conversation `.db` files; fingerprint includes `-wal` so live turns trigger re-import.
+fn discover_antigravity(paths: &Paths) -> Vec<Job> {
+    let mut seen: HashSet<PathBuf> = HashSet::new();
+    let mut out = Vec::new();
+    for root in crate::antigravity::conversation_dirs(paths) {
+        let mut stack = vec![root];
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = fs::read_dir(&dir) else { continue };
+            for e in entries.flatten() {
+                let path = e.path();
+                let Ok(ft) = e.file_type() else { continue };
+                if ft.is_symlink() {
+                    continue;
+                }
+                if ft.is_dir() {
+                    stack.push(path);
+                } else if path.extension().is_some_and(|x| x == "db") {
+                    let canonical = fs::canonicalize(&path).unwrap_or(path);
+                    if !seen.insert(canonical.clone()) {
+                        continue;
+                    }
+                    let Some((size, mtime)) = file_stat(&canonical) else { continue };
+                    let mut wal_os = canonical.as_os_str().to_os_string();
+                    wal_os.push("-wal");
+                    let wal = file_stat(Path::new(&wal_os));
+                    out.push(Job {
+                        key: canonical.to_string_lossy().into_owned(),
+                        path: canonical,
+                        size: size + wal.map_or(0, |w| w.0),
+                        mtime: mtime.max(wal.map_or(0.0, |w| w.1)),
+                        kind: Kind::Antigravity,
+                    });
+                }
             }
         }
     }

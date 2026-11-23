@@ -7,7 +7,8 @@
   import { reducedMotion } from "../motion";
   import { holdToEdit } from "../press";
   import { BRAND } from "../level";
-  import { PROVIDER_NAME, limitsOf, type CardSize, type ProviderId, type Snapshot } from "../types";
+  import { hiddenCardWindows } from "../settings";
+  import { PROVIDERS, PROVIDER_NAME, limitsOf, type CardSize, type ProviderId, type Snapshot } from "../types";
   import EditChrome from "./EditChrome.svelte";
   import ProviderBlock from "./ProviderBlock.svelte";
 
@@ -43,7 +44,7 @@
 
   const rowOf = (p: ProviderId) => rows.findIndex((r) => r.includes(p));
   const paired = (p: ProviderId) => (rows[rowOf(p)]?.length ?? 1) > 1;
-  const seed = (p: ProviderId) => ["claude", "codex", "cursor"].indexOf(p) * 1.9;
+  const seed = (p: ProviderId) => PROVIDERS.indexOf(p) * 1.9;
 
   $effect(() => {
     if (!editing) endDrag();
@@ -120,6 +121,7 @@
     primary={limits ? cardWindow(snap, limits) : null}
     size={sizeOf.get(p) ?? "m"}
     color={snap.settings.cardColors[p] ?? BRAND[p]}
+    hidden={hiddenCardWindows(snap.settings, p)}
   />
 {/snippet}
 

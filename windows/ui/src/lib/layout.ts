@@ -1,5 +1,6 @@
 // Port of `PanelLayout.swift` and the panel parts of `AppModel.swift`.
 
+import { remaining } from "./format";
 import { limitsOf, PROVIDERS, type CardSize, type LimitWindow, type PanelLayout, type ProviderId, type ProviderLimits, type Settings, type Snapshot } from "./types";
 
 export const HIGHEST = "highest";
@@ -68,7 +69,7 @@ export function order(saved: string[]): ProviderId[] {
 
 export function defaultWindow(p: ProviderId): string {
   // The 5-hour window is the one that actually blocks work; Cursor's API bucket is often full while the plan is fine.
-  return p === "claude" ? "5h" : p === "cursor" ? "total" : HIGHEST;
+  return p === "claude" || p === "antigravity" ? "5h" : p === "cursor" ? "total" : HIGHEST;
 }
 
 /** The chosen window, or the most used one. */
@@ -78,6 +79,11 @@ export function pickWindow(choice: string, limits: ProviderLimits): LimitWindow 
     if (w) return w;
   }
   return limits.windows.reduce<LimitWindow | null>((best, w) => (best == null || w.percent > best.percent ? w : best), null);
+}
+
+/** The small windows a card lists next to `primary`. A hidden one still shows once it is used up, so the card explains why work stopped. */
+export function cardSecondaries(windows: LimitWindow[], primary: LimitWindow, hidden: string[]): LimitWindow[] {
+  return windows.filter((w) => w.id !== primary.id && (!hidden.includes(w.id) || remaining(w.percent) <= 0));
 }
 
 export function cardWindow(snap: Snapshot, limits: ProviderLimits): LimitWindow | null {

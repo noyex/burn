@@ -45,6 +45,11 @@ pub fn post_json(url: &str, headers: &[(&str, &str)], body: &str) -> Result<(u16
     read(req.send(body), 10 * 1024 * 1024)
 }
 
+/// POST application/x-www-form-urlencoded.
+pub fn post_form(url: &str, params: &[(&str, &str)]) -> Result<(u16, Vec<u8>), LimitsError> {
+    read(AGENT.post(url).send_form(params.iter().copied()), 10 * 1024 * 1024)
+}
+
 pub fn parse_json_object(body: &[u8]) -> Result<Value, LimitsError> {
     match serde_json::from_slice::<Value>(body) {
         Ok(v) if v.is_object() => Ok(v),

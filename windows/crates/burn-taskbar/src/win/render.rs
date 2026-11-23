@@ -103,6 +103,7 @@ fn logo_svg(provider: Provider) -> &'static str {
         Provider::Claude => include_str!("../../assets/claude.svg"),
         Provider::Codex => include_str!("../../assets/openai.svg"),
         Provider::Cursor => include_str!("../../assets/cursor.svg"),
+        Provider::Antigravity => include_str!("../../assets/antigravity.svg"),
     }
 }
 

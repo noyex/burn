@@ -6,7 +6,7 @@
 
   let { usage, animated = true }: { usage: UsageSummary; animated?: boolean } = $props();
 
-  const SHADES: Record<ProviderId, number> = { claude: 1, codex: 0.45, cursor: 0.25 };
+  const SHADES: Record<ProviderId, number> = { claude: 1, antigravity: 0.7, codex: 0.45, cursor: 0.25 };
   const STACK = [...PROVIDERS].reverse();
   const HEIGHT = 38;
 

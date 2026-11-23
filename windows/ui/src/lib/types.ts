@@ -1,12 +1,18 @@
 // Mirrors the Rust types the app sends (`burn-app/src/model.rs`, `burn-core/src/model.rs`).
 
-export type ProviderId = "claude" | "codex" | "cursor";
-export const PROVIDERS: ProviderId[] = ["claude", "codex", "cursor"];
-export const PROVIDER_NAME: Record<ProviderId, string> = { claude: "Claude", codex: "Codex", cursor: "Cursor" };
+export type ProviderId = "claude" | "codex" | "cursor" | "antigravity";
+export const PROVIDERS: ProviderId[] = ["claude", "codex", "cursor", "antigravity"];
+export const PROVIDER_NAME: Record<ProviderId, string> = {
+  claude: "Claude",
+  codex: "Codex",
+  cursor: "Cursor",
+  antigravity: "Antigravity",
+};
 export const LOGIN_COMMAND: Record<ProviderId, string> = {
   claude: "claude auth login",
   codex: "codex login",
   cursor: "cursor-agent login",
+  antigravity: "agy",
 };
 
 export interface LimitWindow {
@@ -65,6 +71,8 @@ export interface Settings {
   cardSizes: Partial<Record<ProviderId, CardSize>>;
   cardColors: Partial<Record<ProviderId, CardColor>>;
   cardWindows: Partial<Record<ProviderId, string>>;
+  /** Small windows switched off on each card. */
+  hiddenCardWindows: Partial<Record<ProviderId, string[]>>;
   providerOrder: ProviderId[];
   panelLayout: PanelLayout;
   panelOrder: PanelOrder;

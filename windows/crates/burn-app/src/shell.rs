@@ -79,6 +79,7 @@ fn to_entries(entries: &[WidgetEntry]) -> Vec<Entry> {
                 ProviderId::Claude => Provider::Claude,
                 ProviderId::Codex => Provider::Codex,
                 ProviderId::Cursor => Provider::Cursor,
+                ProviderId::Antigravity => Provider::Antigravity,
             },
             used: e.used,
             logo: e.logo,

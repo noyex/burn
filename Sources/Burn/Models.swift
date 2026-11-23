@@ -1,7 +1,7 @@
 import Foundation
 
 enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
-    case claude, codex, cursor
+    case claude, codex, cursor, antigravity
 
     var id: String { rawValue }
 
@@ -10,6 +10,7 @@ enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .claude: "Claude"
         case .codex: "Codex"
         case .cursor: "Cursor"
+        case .antigravity: "Antigravity"
         }
     }
 
@@ -19,6 +20,7 @@ enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .claude: "claude auth login"
         case .codex: "codex login"
         case .cursor: "cursor-agent login"
+        case .antigravity: "agy"
         }
     }
 }
@@ -34,6 +36,16 @@ struct LimitWindow: Identifiable, Hashable, Sendable {
     let resetsAt: Date?
     /// A narrower cap (e.g. one model's weekly limit) shown as a small line, not a big number.
     var minor = false
+}
+
+extension LimitWindow {
+    /// The small windows a card lists next to `primary`. A hidden one still shows once it is used
+    /// up, so the card explains why work stopped.
+    static func cardSecondaries(_ windows: [LimitWindow], primary: LimitWindow, hidden: Set<String>) -> [LimitWindow] {
+        windows.filter { w in
+            w.id != primary.id && (!hidden.contains(w.id) || min(max(100 - w.percent, 0), 100).rounded() <= 0)
+        }
+    }
 }
 
 struct ProviderLimits: Sendable {

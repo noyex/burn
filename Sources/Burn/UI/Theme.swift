@@ -120,6 +120,7 @@ extension ProviderID {
         case .claude: .coral
         case .codex: .mono
         case .cursor: .lavender
+        case .antigravity: .sky
         }
     }
 }

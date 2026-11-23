@@ -63,7 +63,7 @@ const CACHE_MAX_AGE_SECS: f64 = 24.0 * 3600.0;
 
 /// Anthropic list prices for models LiteLLM doesn't list yet; the table wins once it has them.
 /// Bump `BUILTIN_VERSION` on every change so stored costs get recomputed.
-pub const BUILTIN_VERSION: &str = "1";
+pub const BUILTIN_VERSION: &str = "2";
 
 static BUILTIN: LazyLock<HashMap<String, ModelRate>> = LazyLock::new(|| {
     let rate = |input: f64, output: f64, cache_read: f64, fast: Option<f64>| {
@@ -236,7 +236,9 @@ fn read_token_rates(e: &Map<String, Value>, suffix: &str, standard: Option<&Toke
     })
 }
 
-/// `parseRateTable` (LiteLLM document -> normalized-name table, plus unambiguous bare-name aliases).
+const FIRST_PARTY_PROVIDERS: [&str; 7] = ["anthropic", "deepseek", "gemini", "meta", "mistral", "openai", "xai"];
+
+/// `parseRateTable` (LiteLLM document -> normalized-name table, plus bare-name aliases preferring first-party).
 pub fn parse_table(document: &Map<String, Value>) -> HashMap<String, ModelRate> {
     let mut table: HashMap<String, ModelRate> = HashMap::with_capacity(document.len());
     // Sorted so that colliding normalized names resolve the same way on every run.
@@ -260,26 +262,32 @@ pub fn parse_table(document: &Map<String, Value>) -> HashMap<String, ModelRate> 
         let ultrafast = read_token_rates(e, "_ultrafast", Some(&standard));
         table.insert(key, ModelRate { standard, fast, ultrafast });
     }
-    // None = ambiguous.
-    let mut candidates: HashMap<String, Option<ModelRate>> = HashMap::new();
+    // (None, _) = ambiguous within the same tier.
+    let mut candidates: HashMap<String, (Option<ModelRate>, bool)> = HashMap::new();
     for (key, rate) in &table {
         let alias = bare_name(key);
         if alias.is_empty() || alias == key || table.contains_key(alias) {
             continue;
         }
+        let first_party = key.find('/').is_some_and(|i| FIRST_PARTY_PROVIDERS.contains(&&key[..i]));
         match candidates.get_mut(alias) {
-            Some(Some(h)) => {
-                if h != rate {
-                    candidates.insert(alias.to_string(), None);
+            Some((held, held_fp)) => {
+                if first_party && !*held_fp {
+                    *held = Some(*rate);
+                    *held_fp = true;
+                } else if first_party == *held_fp
+                    && let Some(h) = held
+                    && h != rate
+                {
+                    *held = None;
                 }
             }
-            Some(None) => {}
             None => {
-                candidates.insert(alias.to_string(), Some(*rate));
+                candidates.insert(alias.to_string(), (Some(*rate), first_party));
             }
         }
     }
-    for (alias, rate) in candidates {
+    for (alias, (rate, _)) in candidates {
         if let Some(rate) = rate {
             table.insert(alias, rate);
         }

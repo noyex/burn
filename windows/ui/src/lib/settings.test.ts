@@ -97,7 +97,7 @@ describe("settings changes", () => {
     const s = reorder({ ...base(), panelOrder: "closestToLimit" }, ["cursor", "claude"]);
     expect(s.panelOrder).toBe("manual");
     // Codex was hidden from the shown list, so it keeps its slot.
-    expect(s.providerOrder).toEqual(["cursor", "codex", "claude"]);
+    expect(s.providerOrder).toEqual(["cursor", "codex", "claude", "antigravity"]);
   });
 
   it("toggles spending", () => {

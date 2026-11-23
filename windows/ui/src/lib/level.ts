@@ -9,7 +9,7 @@ export function level(used: number): Level {
   return left <= 0 ? "full" : left <= 20 ? "warn" : "normal";
 }
 
-export const BRAND: Record<ProviderId, CardColor> = { claude: "coral", codex: "mono", cursor: "lavender" };
+export const BRAND: Record<ProviderId, CardColor> = { claude: "coral", codex: "mono", cursor: "lavender", antigravity: "sky" };
 
 /** Alert text inside a pill filled with the block's ink, readable on light and dark ink alike. */
 export function alertColor(l: Level, color: CardColor, lightInk: boolean): string {

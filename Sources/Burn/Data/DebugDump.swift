@@ -2,7 +2,7 @@ import Foundation
 
 /// Prints live limits and usage summaries for verification (`Burn --dump`). Never prints tokens.
 func runDebugDump() async {
-    let fetchers: [any LimitsFetcher] = [ClaudeLimitsFetcher(), CodexLimitsFetcher(), CursorLimitsFetcher()]
+    let fetchers: [any LimitsFetcher] = [ClaudeLimitsFetcher(), CodexLimitsFetcher(), CursorLimitsFetcher(), AntigravityLimitsFetcher()]
     for f in fetchers {
         print("== \(f.provider.name) connected=\(f.isConnected())")
         do {

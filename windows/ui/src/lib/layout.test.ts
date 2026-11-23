@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closestToLimit, merge, order, rows, sizes } from "./layout";
+import { cardSecondaries, closestToLimit, merge, order, rows, sizes } from "./layout";
 import type { CardSize, ProviderId } from "./types";
 
 const all: ProviderId[] = ["claude", "codex", "cursor"];
@@ -26,8 +26,8 @@ describe("panel layout", () => {
   });
 
   it("closest to limit sorts by remaining", () => {
-    const remaining: Record<ProviderId, number> = { claude: 40, codex: 80, cursor: 40 };
-    expect(closestToLimit(all, (p) => remaining[p])).toEqual(["claude", "cursor", "codex"]);
+    const remaining: Partial<Record<ProviderId, number>> = { claude: 40, codex: 80, cursor: 40 };
+    expect(closestToLimit(all, (p) => remaining[p] ?? null)).toEqual(["claude", "cursor", "codex"]);
     expect(closestToLimit(all, (p) => (p === "cursor" ? 10 : null))).toEqual(["cursor", "claude", "codex"]);
   });
 
@@ -37,6 +37,17 @@ describe("panel layout", () => {
   });
 
   it("saved order is repaired", () => {
-    expect(order(["cursor", "nope", "cursor"])).toEqual(["cursor", "claude", "codex"]);
+    expect(order(["cursor", "nope", "cursor"])).toEqual(["cursor", "claude", "codex", "antigravity"]);
+  });
+});
+
+describe("cardSecondaries", () => {
+  const w = (id: string, percent: number) => ({ id, label: id, percent, resetsAt: null, minor: false });
+  const primary = w("5h", 20);
+  const windows = [primary, w("week", 99.6), w("3p-5h", 0), w("argon", 0)];
+
+  it("leaves out hidden windows unless they are used up", () => {
+    expect(cardSecondaries(windows, primary, ["week", "3p-5h"]).map((x) => x.id)).toEqual(["week", "argon"]);
+    expect(cardSecondaries(windows, primary, [])).toHaveLength(3);
   });
 });

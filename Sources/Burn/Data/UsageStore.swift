@@ -10,12 +10,12 @@ enum UsageStore {
     }
 
     /// Bump whenever parsing, ids or pricing semantics change: the importer drops and rebuilds `usage` and `files`.
-    static let schemaVersion = "2"
+    static let schemaVersion = "4"
 
     static let schema = """
     CREATE TABLE IF NOT EXISTS usage (
-      id          TEXT PRIMARY KEY,   -- claude: msg_id:req_id; codex: session:ts:model:tokens#occurrence (T3's dedupe identity)
-      provider    TEXT NOT NULL,      -- claude | codex
+      id          TEXT PRIMARY KEY,   -- claude: msg_id:req_id; codex: session:ts:model:tokens#occurrence; antigravity: antigravity:field:id
+      provider    TEXT NOT NULL,      -- claude | codex | antigravity
       model       TEXT,
       ts_ms       INTEGER NOT NULL,
       ts          TEXT NOT NULL,      -- local time, ISO

@@ -242,7 +242,7 @@ struct PopoverView: View {
             SpendBlock(model: model)
         } else if let pct = model.importPercent {
             ProgressView(value: Double(pct), total: 100) {
-                Text("Importing usage from Claude Code and Codex logs…").font(.brand(11))
+                Text("Importing usage from local session logs…").font(.brand(11))
             }
             .tint(theme.accentInk)
             .controlSize(.small)
@@ -280,7 +280,8 @@ struct PopoverView: View {
     private func providerBlock(_ p: ProviderID, size: CardSize) -> some View {
         ProviderBlock(provider: p, state: model.limits[p] ?? .loading,
                       primary: model.limits[p]?.limits.flatMap { model.cardWindow(for: $0) },
-                      size: size, color: model.settings.cardColor(p))
+                      size: size, color: model.settings.cardColor(p),
+                      hidden: model.settings.hiddenCardWindows(p))
             .frame(maxHeight: .infinity)
     }
 

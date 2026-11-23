@@ -49,6 +49,15 @@ export function setCardWindow(s: Settings, p: ProviderId, id: string): Settings 
   return { ...s, cardWindows: { ...s.cardWindows, [p]: id } };
 }
 
+/** Stored as hidden, so windows a provider adds later show up. */
+export const hiddenCardWindows = (s: Settings, p: ProviderId): string[] => s.hiddenCardWindows?.[p] ?? [];
+
+export function setShowsCardWindow(s: Settings, p: ProviderId, id: string, on: boolean): Settings {
+  const rest = hiddenCardWindows(s, p).filter((x) => x !== id);
+  const next = on ? rest : [...rest, id].sort();
+  return { ...s, hiddenCardWindows: { ...s.hiddenCardWindows, [p]: next } };
+}
+
 export function setCardColor(s: Settings, p: ProviderId, color: CardColor): Settings {
   return { ...s, cardColors: { ...s.cardColors, [p]: color } };
 }
