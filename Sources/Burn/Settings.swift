@@ -3,10 +3,11 @@ import Observation
 import ServiceManagement
 
 enum PopoverTab: String, CaseIterable {
-    case usage, system, shelf
+    case dashboard, usage, system, shelf
 
     var title: String {
         switch self {
+        case .dashboard: "Dashboard"
         case .usage: "Usage"
         case .system: "System"
         case .shelf: "Shelf"
@@ -15,9 +16,25 @@ enum PopoverTab: String, CaseIterable {
 
     var symbol: String {
         switch self {
+        case .dashboard: "square.grid.2x2"
         case .usage: "gauge.with.dots.needle.50percent"
         case .system: "cpu"
         case .shelf: "photo.stack"
+        }
+    }
+}
+
+/// A reading from the System tab that can also sit on the dashboard.
+enum DashboardStat: String, CaseIterable, Identifiable {
+    case cpu, memory, disk
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .cpu: "CPU"
+        case .memory: "Memory"
+        case .disk: "Disk"
         }
     }
 }
@@ -31,7 +48,9 @@ final class Settings {
     @ObservationIgnored private let defaults = UserDefaults.standard
     private var hidden: Set<String>
     private var windows: [String: String]
-    private var hiddenInPanel: Set<String>
+    /// Providers left off the dashboard. The old "hidden from the panel" choice, so it carries over.
+    private var hiddenOnDashboard: Set<String>
+    private var hiddenStats: Set<String>
     private var cardSizes: [String: String]
     private var cardColors: [String: String]
     private var cardWindows: [String: String]
@@ -46,10 +65,6 @@ final class Settings {
 
     var panelOrder: PanelOrder {
         didSet { defaults.set(panelOrder.rawValue, forKey: "panel.order") }
-    }
-
-    var showsSpending: Bool {
-        didSet { defaults.set(showsSpending, forKey: "panel.showsSpending") }
     }
 
     var tab: PopoverTab {
@@ -79,15 +94,18 @@ final class Settings {
         // `--tab system` opens the preview window on a tab without saving it, for screenshots.
         let args = CommandLine.arguments
         let flag = args.contains("--preview") ? args.firstIndex(of: "--tab").flatMap { args.dropFirst($0 + 1).first } : nil
-        tab = (flag ?? defaults.string(forKey: "popover.tab")).flatMap(PopoverTab.init) ?? .usage
+        // The dashboard is the main tab: everyone lands on it once, then the last tab sticks.
+        let saved = defaults.bool(forKey: "popover.dashboardIntroduced") ? defaults.string(forKey: "popover.tab") : nil
+        tab = (flag ?? saved).flatMap(PopoverTab.init) ?? .dashboard
+        if flag == nil { defaults.set(true, forKey: "popover.dashboardIntroduced") }
         shelfExpanded = defaults.bool(forKey: "shelf.expanded")
         resourceAlerts = defaults.object(forKey: "menuBar.resourceAlerts") as? Bool ?? true
         shelfRetentionDays = defaults.object(forKey: "shelf.retentionDays") as? Int ?? 7
         providerOrder = PanelArrangement.order(from: defaults.stringArray(forKey: "panel.providerOrder") ?? [])
         panelLayout = defaults.string(forKey: "panel.layout").flatMap(PanelLayout.init) ?? .custom
         panelOrder = defaults.string(forKey: "panel.order").flatMap(PanelOrder.init) ?? .manual
-        showsSpending = defaults.object(forKey: "panel.showsSpending") as? Bool ?? true
-        hiddenInPanel = Set(defaults.stringArray(forKey: "panel.hidden") ?? [])
+        hiddenOnDashboard = Set(defaults.stringArray(forKey: "panel.hidden") ?? [])
+        hiddenStats = Set(defaults.stringArray(forKey: "dashboard.hiddenStats") ?? [])
         cardSizes = defaults.dictionary(forKey: "panel.sizes") as? [String: String] ?? [:]
         cardColors = defaults.dictionary(forKey: "panel.colors") as? [String: String] ?? [:]
         hiddenCardWindows = defaults.dictionary(forKey: "panel.hiddenWindows") as? [String: [String]] ?? [:]
@@ -125,14 +143,26 @@ final class Settings {
         }
     }
 
-    // MARK: Panel
+    // MARK: Dashboard
 
-    func showsInPanel(_ p: ProviderID) -> Bool { !hiddenInPanel.contains(p.rawValue) }
+    func showsOnDashboard(_ p: ProviderID) -> Bool { !hiddenOnDashboard.contains(p.rawValue) }
 
-    func setShowsInPanel(_ p: ProviderID, _ on: Bool) {
-        if on { hiddenInPanel.remove(p.rawValue) } else { hiddenInPanel.insert(p.rawValue) }
-        defaults.set(Array(hiddenInPanel), forKey: "panel.hidden")
+    func setShowsOnDashboard(_ p: ProviderID, _ on: Bool) {
+        if on { hiddenOnDashboard.remove(p.rawValue) } else { hiddenOnDashboard.insert(p.rawValue) }
+        defaults.set(Array(hiddenOnDashboard), forKey: "panel.hidden")
     }
+
+    func showsOnDashboard(_ stat: DashboardStat) -> Bool { !hiddenStats.contains(stat.rawValue) }
+
+    func setShowsOnDashboard(_ stat: DashboardStat, _ on: Bool) {
+        if on { hiddenStats.remove(stat.rawValue) } else { hiddenStats.insert(stat.rawValue) }
+        defaults.set(Array(hiddenStats), forKey: "dashboard.hiddenStats")
+    }
+
+    /// Readings shown on the dashboard, in a fixed order.
+    var dashboardStats: [DashboardStat] { DashboardStat.allCases.filter(showsOnDashboard) }
+
+    // MARK: Usage cards
 
     /// Size saved for the Custom layout.
     func customSize(_ p: ProviderID) -> CardSize {

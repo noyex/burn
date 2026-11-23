@@ -22,11 +22,11 @@ struct ProviderSettingsView: View {
             SettingsSectionTitle("CARD")
             SettingsGroup {
                 HStack {
-                    Text("Show in panel")
+                    Text("Show on dashboard")
                     Spacer()
-                    Toggle("Show in panel", isOn: Binding(
-                        get: { model.settings.showsInPanel(p) },
-                        set: { on in withAnimation(.snappy(duration: 0.25)) { model.settings.setShowsInPanel(p, on) } }))
+                    Toggle("Show on dashboard", isOn: Binding(
+                        get: { model.settings.showsOnDashboard(p) },
+                        set: { on in withAnimation(.snappy(duration: 0.25)) { model.settings.setShowsOnDashboard(p, on) } }))
                         .labelsHidden()
                         .toggleStyle(.switch)
                         .controlSize(.small)

@@ -49,10 +49,7 @@ struct SettingsView: View {
             }
             .padding(.bottom, 4)
 
-            SettingsSectionTitle("PANEL")
-            SettingsGroup { panelRows }
-
-            SettingsSectionTitle("PROVIDERS")
+            SettingsSectionTitle("DASHBOARD")
             SettingsGroup {
                 let order = model.orderedProviders
                 ForEach(Array(order.enumerated()), id: \.element) { i, p in
@@ -62,6 +59,25 @@ struct SettingsView: View {
                         .zIndex(draggedRow == p ? 1 : 0)
                 }
             }
+            SettingsGroup {
+                ForEach(Array(DashboardStat.allCases.enumerated()), id: \.element) { i, stat in
+                    if i > 0 { Divider().opacity(0.6) }
+                    HStack {
+                        Text(stat.title)
+                        Spacer()
+                        Toggle("Show \(stat.title) on dashboard", isOn: Binding(
+                            get: { model.settings.showsOnDashboard(stat) },
+                            set: { model.settings.setShowsOnDashboard(stat, $0) }))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
+                    .frame(height: 32)
+                }
+            }
+
+            SettingsSectionTitle("USAGE CARDS")
+            SettingsGroup { panelRows }
 
             if !model.connected.isEmpty {
                 SettingsSectionTitle("MENU BAR")
@@ -176,19 +192,9 @@ struct SettingsView: View {
         }
         .frame(height: 32)
         Divider().opacity(0.6)
-        HStack {
-            Text("Show spending")
-            Spacer()
-            Toggle("Show spending", isOn: $settings.showsSpending)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
-        }
-        .frame(height: 32)
-        Divider().opacity(0.6)
         Button(action: onArrange) {
             HStack {
-                Text("Arrange in panel…")
+                Text("Arrange cards…")
                 Spacer()
                 Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(theme.secondary)
             }
@@ -216,9 +222,9 @@ struct SettingsView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { open(p) }
-            Toggle("Show \(p.name) in panel", isOn: Binding(
-                get: { model.settings.showsInPanel(p) },
-                set: { model.settings.setShowsInPanel(p, $0) }))
+            Toggle("Show \(p.name) on dashboard", isOn: Binding(
+                get: { model.settings.showsOnDashboard(p) },
+                set: { model.settings.setShowsOnDashboard(p, $0) }))
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .controlSize(.small)

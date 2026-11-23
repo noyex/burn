@@ -103,9 +103,10 @@ struct PopoverView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // Animated theme patterns stand still while the panel is closed.
         .environment(\.patternsMoving, visible)
-        // Reads every couple of seconds only while the System tab is on screen. Here, not on
-        // `main`, which leaves the tree when Settings opens and would never see that change.
-        .onChange(of: visible && model.settings.tab == .system && !showingSettings, initial: true) { _, live in
+        // Reads every couple of seconds only while the System tab, or a dashboard with readings,
+        // is on screen. Here, not on `main`, which leaves the tree when Settings opens and would
+        // never see that change.
+        .onChange(of: visible && readingsShown && !showingSettings, initial: true) { _, live in
             model.system.setLive(live)
         }
         .onChange(of: visible) { _, visible in
@@ -120,6 +121,14 @@ struct PopoverView: View {
                 selection = []
                 confirmingClear = false
             }
+        }
+    }
+
+    private var readingsShown: Bool {
+        switch model.settings.tab {
+        case .system: true
+        case .dashboard: !model.settings.dashboardStats.isEmpty
+        case .usage, .shelf: false
         }
     }
 
@@ -138,6 +147,12 @@ struct PopoverView: View {
             // incoming tab counts toward the layout, so the footer glides straight to where it ends.
             ZStack(alignment: .topLeading) {
                 switch settings.tab {
+                case .dashboard:
+                    DashboardView(model: model, visible: model.popoverVisible) {
+                        withAnimation(.snappy(duration: 0.25)) { showingSettings = true }
+                    }
+                    .frame(width: Self.usageWidth)
+                    .transition(tabTransition)
                 case .usage:
                     VStack(alignment: .leading, spacing: Bento.gap) { usage }
                         .frame(width: Self.usageWidth)
@@ -194,7 +209,7 @@ struct PopoverView: View {
         let sizes = model.settings.cardSizes(for: cards)
         let rows = PanelArrangement.rows(cards, sizes: sizes)
         if model.connected.isEmpty {
-            signIn.reveal(visible, index: 0)
+            SignInBlock().reveal(visible, index: 0)
         } else {
             if !cards.isEmpty {
                 CardGrid(rows: rows, spacing: Bento.gap) {
@@ -214,26 +229,15 @@ struct PopoverView: View {
             ForEach(issues) { p in
                 ProviderIssueRow(provider: p, state: model.limits[p] ?? .loading)
                     .allowsHitTesting(!editing)
-                    .editChrome(editing, title: p.name, size: nil) { hide(p) }
                     .wiggle(editing, seed: seed(p), amplitude: 0.35)
                     .reveal(visible, index: rows.count)
             }
         }
-        if model.settings.showsSpending {
-            spend
-                .allowsHitTesting(!editing)
-                .startsEditing { startEditing() }
-                .editChrome(editing, title: "Spent", size: nil) {
-                    withAnimation(.snappy(duration: 0.25)) { model.settings.showsSpending = false }
-                }
-                .wiggle(editing, seed: 5.3, amplitude: 0.35)
-                .reveal(visible, index: rows.count + 1)
-        }
-        if editing {
-            hiddenCards.transition(.opacity)
-        } else if !model.connected.isEmpty, shown.isEmpty, !spendShown {
-            emptyPanel.reveal(visible, index: 0)
-        }
+        spend
+            .allowsHitTesting(!editing)
+            .startsEditing { startEditing() }
+            .wiggle(editing, seed: 5.3, amplitude: 0.35)
+            .reveal(visible, index: rows.count + 1)
     }
 
     @ViewBuilder
@@ -250,8 +254,6 @@ struct PopoverView: View {
             .block(.accent)
         }
     }
-
-    private var spendShown: Bool { model.settings.showsSpending && (model.hasUsage || model.importPercent != nil) }
 
     private func card(_ p: ProviderID, size: CardSize) -> some View {
         let editing = model.editingPanel
@@ -273,7 +275,7 @@ struct PopoverView: View {
                     withAnimation(.snappy(duration: 0.25)) {
                         model.settings.setCardSize(p, new, cards: model.cardProviders)
                     }
-                })) { hide(p) }
+                }))
             .wiggle(editing && !lifted, seed: seed(p), amplitude: size == .m ? 0.6 : 0.35)
     }
 
@@ -295,10 +297,6 @@ struct PopoverView: View {
     private func startEditing() {
         guard !model.editingPanel else { return }
         withAnimation(.snappy(duration: 0.25)) { model.editingPanel = true }
-    }
-
-    private func hide(_ p: ProviderID) {
-        withAnimation(.snappy(duration: 0.25)) { model.settings.setShowsInPanel(p, false) }
     }
 
     /// Follows the pointer with a copy of the card while the card itself leaves a gap that moves
@@ -342,69 +340,11 @@ struct PopoverView: View {
         }
     }
 
-    /// What's hidden from the panel, each one a button that brings it back.
-    @ViewBuilder
-    private var hiddenCards: some View {
-        let providers = model.settings.providerOrder.filter { model.connected.contains($0) && !model.settings.showsInPanel($0) }
-        if !providers.isEmpty || !model.settings.showsSpending {
-            HStack(spacing: Bento.gap) {
-                ForEach(providers) { p in
-                    addButton(p.name) { model.settings.setShowsInPanel(p, true) }
-                }
-                if !model.settings.showsSpending {
-                    addButton("Spent") { model.settings.showsSpending = true }
-                }
-            }
-        }
-    }
-
-    private func addButton(_ title: String, _ action: @escaping () -> Void) -> some View {
-        Button {
-            withAnimation(.snappy(duration: 0.25)) { action() }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "plus").font(.system(size: 10, weight: .bold))
-                Text(title).font(.brand(12, .bold))
-            }
-            .padding(.horizontal, 11)
-            .frame(height: 28)
-            .floating(theme.surface, in: Bento.pill)
-            .contentShape(Bento.pill)
-        }
-        .buttonStyle(PressStyle())
-        .accessibilityLabel("Show \(title)")
-    }
-
-    private var emptyPanel: some View {
-        VStack(spacing: 10) {
-            Text("Everything is hidden from the panel").font(.brand(12)).foregroundStyle(theme.secondary)
-            Button("Edit panel") { startEditing() }
-                .buttonStyle(PillButtonStyle(prominent: true))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .block(.neutral)
-    }
-
-    private var signIn: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Sign in to a provider in Terminal:")
-                .font(.brand(12))
-                .foregroundStyle(theme.secondary)
-            ForEach(ProviderID.allCases) { p in
-                HStack(spacing: 8) {
-                    ProviderGlyph(provider: p, color: theme.text)
-                    CommandChip(command: p.loginCommand)
-                }
-            }
-        }
-        .block(.neutral)
-    }
-
     // MARK: Footer
 
     private var footer: some View {
         let onUsage = model.settings.tab == .usage
+        let onLimits = onUsage || model.settings.tab == .dashboard
         let onShelf = model.settings.tab == .shelf
         let editing = model.editingPanel
         return HStack(spacing: Bento.gap) {
@@ -415,7 +355,7 @@ struct PopoverView: View {
                     syncStatus
                     if let usage = model.usage, usage.cost > 0 { shareButton(usage) }
                 }
-                .footerRow(shown: onUsage && !editing)
+                .footerRow(shown: onLimits && !editing)
                 HStack(spacing: Bento.gap) { shelfActions }
                     .footerRow(shown: onShelf)
                 HStack(spacing: Bento.gap) {
@@ -423,7 +363,7 @@ struct PopoverView: View {
                     Button("Activity Monitor") { openActivityMonitor() }
                         .buttonStyle(PillButtonStyle())
                 }
-                .footerRow(shown: !onUsage && !onShelf)
+                .footerRow(shown: model.settings.tab == .system)
                 HStack(spacing: Bento.gap) {
                     Text("Drag to reorder").foregroundStyle(theme.secondary).padding(.leading, 8)
                     Spacer()
