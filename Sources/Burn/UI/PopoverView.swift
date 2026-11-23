@@ -69,9 +69,15 @@ struct PopoverView: View {
                     .block(.surface)
                     .frame(width: Self.usageWidth)
                     if previewShown {
+                        // The tab the user came from: the dashboard, or the Usage cards.
+                        let onDashboard = model.settings.tab == .dashboard
                         VStack(alignment: .leading, spacing: Bento.gap) {
-                            IconSwitcher(selection: .constant(.usage)).padding(.bottom, 2)
-                            usage
+                            IconSwitcher(selection: .constant(onDashboard ? .dashboard : .usage)).padding(.bottom, 2)
+                            if onDashboard {
+                                DashboardView(model: model, visible: model.popoverVisible) {}
+                            } else {
+                                usage
+                            }
                         }
                         .frame(width: Self.usageWidth)
                         // Only there to be looked at.

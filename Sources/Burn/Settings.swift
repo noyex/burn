@@ -96,8 +96,13 @@ final class Settings {
         let flag = args.contains("--preview") ? args.firstIndex(of: "--tab").flatMap { args.dropFirst($0 + 1).first } : nil
         // The dashboard is the main tab: everyone lands on it once, then the last tab sticks.
         let saved = defaults.bool(forKey: "popover.dashboardIntroduced") ? defaults.string(forKey: "popover.tab") : nil
-        tab = (flag ?? saved).flatMap(PopoverTab.init) ?? .dashboard
-        if flag == nil { defaults.set(true, forKey: "popover.dashboardIntroduced") }
+        let tab = (flag ?? saved).flatMap(PopoverTab.init) ?? .dashboard
+        self.tab = tab
+        if flag == nil {
+            defaults.set(true, forKey: "popover.dashboardIntroduced")
+            // `didSet` doesn't run in `init`; save it so the next launch keeps the dashboard.
+            defaults.set(tab.rawValue, forKey: "popover.tab")
+        }
         shelfExpanded = defaults.bool(forKey: "shelf.expanded")
         resourceAlerts = defaults.object(forKey: "menuBar.resourceAlerts") as? Bool ?? true
         shelfRetentionDays = defaults.object(forKey: "shelf.retentionDays") as? Int ?? 7

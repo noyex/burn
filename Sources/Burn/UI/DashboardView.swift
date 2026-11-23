@@ -114,6 +114,8 @@ struct DashboardTile: View {
                 }
             } else if state.limits == nil {
                 skeleton
+            } else {
+                Text("No limits reported").font(.brand(11)).opacity(0.75).padding(.top, 10)
             }
         }
         .foregroundStyle(ink)
@@ -173,7 +175,8 @@ struct DashboardTile: View {
     }
 
     private var accessibilityValue: String {
-        guard let limits = state.limits, let primary else { return "Loading" }
+        guard let limits = state.limits else { return "Loading" }
+        guard let primary else { return "No limits reported" }
         var parts = ["\(primary.label) \(primary.left)% left"]
         if let second = secondary(limits, primary: primary) { parts.append("\(second.label) \(second.left)% left") }
         return parts.joined(separator: ", ")
