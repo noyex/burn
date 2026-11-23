@@ -155,7 +155,12 @@ final class ThemeStore {
 
         var next = ResolvedTheme.standard
         var problems: [String] = []
-        if let name {
+        if let flag = CommandLine.arguments.firstIndex(of: "--theme-file"),
+           let path = CommandLine.arguments.dropFirst(flag + 1).first,
+           let loaded = Self.loadFile(URL(fileURLWithPath: path), families: families) {
+            // Development aid: a preview window in some theme without touching the user's choice.
+            (next, problems) = loaded
+        } else if let name {
             // A name, never a path out of the themes folder.
             if name.contains("/") || name.hasPrefix(".") {
                 problems = ["active.txt must hold a theme's file name, not a path."]
