@@ -25,6 +25,7 @@ final class SystemMonitor {
     @ObservationIgnored private let sampler = SystemSampler()
     @ObservationIgnored private var liveTask: Task<Void, Never>?
     @ObservationIgnored private var alertTimer: Timer?
+    @ObservationIgnored private var lastSample: Date?
 
     /// Starts or stops the fast readings behind the System tab.
     func setLive(_ live: Bool) {
@@ -32,6 +33,8 @@ final class SystemMonitor {
         liveTask?.cancel()
         liveTask = nil
         guard live else { return }
+        // A gap in the line would read as a drop; start it over after a pause.
+        if (lastSample.map { Date.now.timeIntervalSince($0) > 10 }) ?? true { cpuHistory = [] }
         liveTask = Task { [weak self, sampler] in
             await sampler.reset()
             // A quick first pair, so the rates show up right away.
@@ -53,6 +56,7 @@ final class SystemMonitor {
         if next.network == nil { next.network = snapshot.network }
         if next.apps.isEmpty { next.apps = snapshot.apps }
         snapshot = next
+        lastSample = .now
         if let cpu = snap.cpu {
             cpuHistory.append(cpu)
             if cpuHistory.count > Self.historyLength { cpuHistory.removeFirst(cpuHistory.count - Self.historyLength) }
@@ -99,17 +103,11 @@ struct SystemAlert: Equatable {
 
     /// The more urgent of the two, or nil when both are fine.
     init?(disk: SystemSnapshot.Disk?, pressure: MemoryPressure) {
-        let diskLevel: MenuBarImage.Level? = disk.flatMap {
-            $0.free < SystemMonitor.diskFull ? .full : $0.free < SystemMonitor.diskLow ? .warn : nil
-        }
-        let memoryLevel: MenuBarImage.Level? = switch pressure {
-        case .critical: .full
-        case .warning: .warn
-        case .normal: nil
-        }
-        if let disk, let diskLevel, diskLevel == .full || memoryLevel != .full {
+        let diskLevel = disk.map { MenuBarImage.Level(free: $0.free) } ?? .normal
+        let memoryLevel = MenuBarImage.Level(pressure)
+        if let disk, diskLevel != .normal, diskLevel == .full || memoryLevel != .full {
             self.init(kind: .disk(free: disk.free), level: diskLevel)
-        } else if let memoryLevel {
+        } else if memoryLevel != .normal {
             self.init(kind: .memory, level: memoryLevel)
         } else {
             return nil

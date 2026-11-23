@@ -137,6 +137,10 @@ struct PopoverView: View {
                     VStack(alignment: .leading, spacing: Bento.gap) { usage }
                         .frame(width: Self.usageWidth)
                         .transition(tabTransition)
+                case .system:
+                    SystemView(monitor: model.system, visible: model.popoverVisible)
+                        .frame(width: Self.usageWidth)
+                        .transition(tabTransition)
                 case .shelf:
                     ShelfView(shelf: model.shelf, width: shelfWidth,
                               columns: settings.shelfExpanded ? 4 : 2, maxHeight: settings.shelfExpanded ? 560 : 380,
@@ -152,6 +156,10 @@ struct PopoverView: View {
         }
         .onChange(of: settings.tab) { _, tab in
             if tab != .usage { model.editingPanel = false }
+        }
+        // Reads every couple of seconds only while the System tab is on screen.
+        .onChange(of: model.popoverVisible && settings.tab == .system && !showingSettings, initial: true) { _, live in
+            model.system.setLive(live)
         }
         .onChange(of: model.editingPanel) { _, editing in
             if !editing { dragging = nil }
@@ -395,6 +403,7 @@ struct PopoverView: View {
 
     private var footer: some View {
         let onUsage = model.settings.tab == .usage
+        let onShelf = model.settings.tab == .shelf
         let editing = model.editingPanel
         return HStack(spacing: Bento.gap) {
             // The rows stay in the tree and crossfade: a row that was inserted or removed would
@@ -406,7 +415,13 @@ struct PopoverView: View {
                 }
                 .footerRow(shown: onUsage && !editing)
                 HStack(spacing: Bento.gap) { shelfActions }
-                    .footerRow(shown: !onUsage)
+                    .footerRow(shown: onShelf)
+                HStack(spacing: Bento.gap) {
+                    Spacer()
+                    Button("Activity Monitor") { openActivityMonitor() }
+                        .buttonStyle(PillButtonStyle())
+                }
+                .footerRow(shown: !onUsage && !onShelf)
                 HStack(spacing: Bento.gap) {
                     Text("Drag to reorder").foregroundStyle(theme.secondary).padding(.leading, 8)
                     Spacer()
@@ -433,10 +448,15 @@ struct PopoverView: View {
         .animation(.easeOut(duration: 0.2), value: updateShown)
     }
 
+    private func openActivityMonitor() {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.ActivityMonitor") else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: .init())
+    }
+
     /// Kept out of the way while screenshots are selected or cards are arranged, the footer is full then.
     private var updateShown: Updater.Release? {
         guard !model.editingPanel else { return nil }
-        return model.settings.tab == .usage || selection.isEmpty ? model.updater.available : nil
+        return model.settings.tab != .shelf || selection.isEmpty ? model.updater.available : nil
     }
 
     private func updateButton(_ release: Updater.Release) -> some View {

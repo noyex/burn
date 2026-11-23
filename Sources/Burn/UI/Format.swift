@@ -61,18 +61,28 @@ enum Format {
     }
 
     /// `bytes` split into the number and its unit, for a big number with a small unit.
-    static func bytesParts<T: BinaryInteger>(_ v: T) -> (String, String) {
+    static func bytesParts<T: BinaryInteger>(_ v: T, base: Double = 1000) -> (String, String) {
         let d = Double(v)
         let (value, unit): (Double, String) = switch d {
-        case 1e12...: (d / 1e12, "TB")
-        case 1e9...: (d / 1e9, "GB")
-        case 1e6...: (d / 1e6, "MB")
-        default: (d / 1e3, "KB")
+        case pow(base, 4)...: (d / pow(base, 4), "TB")
+        case pow(base, 3)...: (d / pow(base, 3), "GB")
+        case pow(base, 2)...: (d / pow(base, 2), "MB")
+        default: (d / base, "KB")
         }
         // One decimal below 10, where it still says something.
         let text = value < 10 && value.rounded() != value
             ? String(format: "%.1f", locale: en, value) : String(Int(value.rounded()))
         return (text, unit)
+    }
+
+    /// Memory in binary units, like Activity Monitor: 32 GiB reads "32 GB".
+    static func memory(_ v: UInt64) -> String {
+        let (number, unit) = memoryParts(v)
+        return "\(number) \(unit)"
+    }
+
+    static func memoryParts(_ v: UInt64) -> (String, String) {
+        bytesParts(v, base: 1024)
     }
 
     /// "4.2 MB/s", "210 KB/s", "0 KB/s".
