@@ -123,19 +123,13 @@ fn token_sources(paths: &Paths) -> Vec<TokenSource> {
 }
 
 pub fn is_connected(paths: &Paths) -> bool {
-    if !token_sources(paths).is_empty() {
-        return true;
-    }
+    let has_file = !token_sources(paths).is_empty();
     #[cfg(target_os = "macos")]
-    {
-        http::keychain_item_exists("gemini", Some("antigravity"))
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        false
-    }
+    let has_file = has_file || http::keychain_item_exists("gemini", Some("antigravity"));
+    has_file
 }
 
+#[cfg(any(target_os = "macos", test))]
 pub(crate) fn decode_go_keyring_secret(raw: &str) -> String {
     if let Some(b64) = raw.strip_prefix("go-keyring-base64:")
         && let Some(bytes) = decode_base64(b64)
@@ -152,6 +146,7 @@ pub(crate) fn decode_go_keyring_secret(raw: &str) -> String {
     raw.to_string()
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn decode_hex(s: &str) -> Option<Vec<u8>> {
     let b = s.as_bytes();
     if !b.len().is_multiple_of(2) {
@@ -170,6 +165,7 @@ fn decode_hex(s: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn decode_base64(s: &str) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(s.len() * 3 / 4);
     let mut buf: u32 = 0;
