@@ -54,6 +54,37 @@ enum Format {
         return reset(date, now: now)
     }
 
+    /// Decimal units, like Finder: "182 GB", "8.4 GB", "1.2 TB", "640 MB".
+    static func bytes<T: BinaryInteger>(_ v: T) -> String {
+        let (number, unit) = bytesParts(v)
+        return "\(number) \(unit)"
+    }
+
+    /// `bytes` split into the number and its unit, for a big number with a small unit.
+    static func bytesParts<T: BinaryInteger>(_ v: T) -> (String, String) {
+        let d = Double(v)
+        let (value, unit): (Double, String) = switch d {
+        case 1e12...: (d / 1e12, "TB")
+        case 1e9...: (d / 1e9, "GB")
+        case 1e6...: (d / 1e6, "MB")
+        default: (d / 1e3, "KB")
+        }
+        // One decimal below 10, where it still says something.
+        let text = value < 10 && value.rounded() != value
+            ? String(format: "%.1f", locale: en, value) : String(Int(value.rounded()))
+        return (text, unit)
+    }
+
+    /// "4.2 MB/s", "210 KB/s", "0 KB/s".
+    static func rate(_ bytesPerSecond: Double) -> String {
+        bytesPerSecond < 1e3 ? "0 KB/s" : bytes(Int64(bytesPerSecond)) + "/s"
+    }
+
+    /// "4h 10m", "45m".
+    static func minutes(_ m: Int) -> String {
+        m < 60 ? "\(m)m" : m % 60 == 0 ? "\(m / 60)h" : "\(m / 60)h \(m % 60)m"
+    }
+
     static func synced(_ date: Date?, now: Date = .now) -> String {
         guard let date else { return "Not synced yet" }
         let s = now.timeIntervalSince(date)
