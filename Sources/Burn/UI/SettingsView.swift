@@ -74,6 +74,21 @@ struct SettingsView: View {
             }
 
             SettingsGroup {
+                HStack {
+                    Text("Warn about low disk or memory")
+                    Spacer()
+                    Toggle("Warn about low disk or memory", isOn: Binding(
+                        get: { model.settings.resourceAlerts },
+                        set: { model.settings.resourceAlerts = $0; model.system.watchAlerts($0) }))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                }
+                .frame(height: 32)
+                .hoverTip("Shows in the menu bar when under 10 GB is free or memory runs out")
+            }
+
+            SettingsGroup {
                 Button {
                     withAnimation(.snappy(duration: 0.25)) { pickingTheme = true }
                 } label: {

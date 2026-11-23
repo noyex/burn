@@ -45,6 +45,7 @@ final class AppModel {
     let settings = Settings()
     let shelf: ShelfStore
     let updater = Updater()
+    let system = SystemMonitor()
 
     /// Called whenever something shown in the menu bar changes.
     @ObservationIgnored var onMenuBarChange: (() -> Void)?
@@ -64,6 +65,8 @@ final class AppModel {
 
     func start(capturingClipboard: Bool = true, checkingUpdates: Bool = true) {
         shelf.start(capturing: capturingClipboard)
+        system.onAlertChange = { [weak self] in self?.onMenuBarChange?() }
+        system.watchAlerts(settings.resourceAlerts)
         Task { await refreshLimits() }
         Task { await loadUsage(); await sync() }
         schedule(every: 120) { [weak self] in await self?.refreshLimits() }

@@ -3,11 +3,12 @@ import Observation
 import ServiceManagement
 
 enum PopoverTab: String, CaseIterable {
-    case usage, shelf
+    case usage, system, shelf
 
     var title: String {
         switch self {
         case .usage: "Usage"
+        case .system: "System"
         case .shelf: "Shelf"
         }
     }
@@ -15,6 +16,7 @@ enum PopoverTab: String, CaseIterable {
     var symbol: String {
         switch self {
         case .usage: "gauge.with.dots.needle.50percent"
+        case .system: "cpu"
         case .shelf: "photo.stack"
         }
     }
@@ -53,6 +55,11 @@ final class Settings {
         didSet { defaults.set(tab.rawValue, forKey: "popover.tab") }
     }
 
+    /// The menu bar warns when the disk is almost full or memory runs out.
+    var resourceAlerts: Bool {
+        didSet { defaults.set(resourceAlerts, forKey: "menuBar.resourceAlerts") }
+    }
+
     /// Shelf shown in the wide popover with more screenshots per row.
     var shelfExpanded: Bool {
         didSet { defaults.set(shelfExpanded, forKey: "shelf.expanded") }
@@ -68,8 +75,12 @@ final class Settings {
         let menuBarWindows = defaults.dictionary(forKey: "menuBar.windows") as? [String: String] ?? [:]
         windows = menuBarWindows
         launchAtLogin = SMAppService.mainApp.status == .enabled
-        tab = defaults.string(forKey: "popover.tab").flatMap(PopoverTab.init) ?? .usage
+        // `--tab system` opens the preview window on a tab without saving it, for screenshots.
+        let args = CommandLine.arguments
+        let flag = args.contains("--preview") ? args.firstIndex(of: "--tab").flatMap { args.dropFirst($0 + 1).first } : nil
+        tab = (flag ?? defaults.string(forKey: "popover.tab")).flatMap(PopoverTab.init) ?? .usage
         shelfExpanded = defaults.bool(forKey: "shelf.expanded")
+        resourceAlerts = defaults.object(forKey: "menuBar.resourceAlerts") as? Bool ?? true
         shelfRetentionDays = defaults.object(forKey: "shelf.retentionDays") as? Int ?? 7
         providerOrder = PanelArrangement.order(from: defaults.stringArray(forKey: "panel.providerOrder") ?? [])
         panelLayout = defaults.string(forKey: "panel.layout").flatMap(PanelLayout.init) ?? .custom

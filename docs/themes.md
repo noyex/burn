@@ -96,25 +96,25 @@ transparent to `FF` solid). Named colors and `rgb()` are not supported.
 | Token | Light | Dark | Where it shows |
 |---|---|---|---|
 | `base` | `#F7F5F2` | `#161514` | Text on a prominent button, background of the share image |
-| `neutral` | `#ECE9E4` | `#252321` | Neutral blocks: settings groups, buttons, shelf tiles |
+| `neutral` | `#ECE9E4` | `#252321` | Neutral blocks: settings groups, buttons, shelf tiles, the app list on the System tab |
 | `neutral-hover` | `#E3DFD9` | `#302D2B` | A neutral button under the pointer |
 | `raised` | `#FFFFFF` | `#3D3936` | The selected pill in a segmented control |
 | `text` | `#1C1A17` | `#F2EFEA` | Main text, prominent buttons |
 | `secondary` | `#7A746C` | `#9C958C` | Muted text and icons |
 | `surface` | `#FBFAF8` | `#1F1D1B` | Floating chrome: the settings panel, footer, tooltips |
-| `switcher` | `#1C1A17` | `#2E2B28` | The Usage / Shelf tab capsule |
+| `switcher` | `#1C1A17` | `#2E2B28` | The Usage / System / Shelf tab capsule |
 | `switcher-ink` | `#FFFFFF` | `#FFFFFF` | Icons on the tab capsule |
 | `hairline` | `#0000000A` | `#FFFFFF14` | Thin edge around every block |
 | `shadow` | `#00000029` | `#00000066` | Shadow under every block |
-| `accent` | `#DFF26B` | `#DFF26B` | The spend block, the import progress, the empty shelf |
+| `accent` | `#DFF26B` | `#DFF26B` | The spend block, the import progress, the empty shelf, the CPU block on the System tab |
 | `accent-ink` | `#1A1D06` | `#1A1D06` | Text and bars on `accent` |
-| `coral` | `#D97757` | `#D97757` | Provider card color "Coral" (Claude by default) |
+| `coral` | `#D97757` | `#D97757` | Provider card color "Coral" (Claude by default), the network block on the System tab |
 | `coral-ink` | `#FFFFFF` | `#FFFFFF` | Text on `coral` |
-| `mono` | `#141414` | `#F2F1EE` | Provider card color "Mono" (Codex by default) |
+| `mono` | `#141414` | `#F2F1EE` | Provider card color "Mono" (Codex by default), the disk block on the System tab |
 | `mono-ink` | `#FFFFFF` | `#141414` | Text on `mono` |
-| `lavender` | `#C9C5FF` | `#C9C5FF` | Provider card color "Lavender" (Cursor by default) |
+| `lavender` | `#C9C5FF` | `#C9C5FF` | Provider card color "Lavender" (Cursor by default), the memory block on the System tab |
 | `lavender-ink` | `#1B1840` | `#1B1840` | Text on `lavender` |
-| `sky` | `#B4DDF7` | `#B4DDF7` | Provider card color "Sky" |
+| `sky` | `#B4DDF7` | `#B4DDF7` | Provider card color "Sky", the battery block on the System tab |
 | `sky-ink` | `#0C2C42` | `#0C2C42` | Text on `sky` |
 | `warn-on-light` | `#C25E00` | `#C25E00` | "Almost out" text on a card whose ink is light |
 | `full-on-light` | `#D92D20` | `#D92D20` | "Limit reached" text on a card whose ink is light |
@@ -164,7 +164,9 @@ then an image, then a pattern. Use any one or combine them.
 ```
 
 Blocks you can set: `accent` (the spend block), `coral`, `mono`, `lavender`, `sky` (provider
-cards), `neutral` (notices and empty states) and `surface` (the settings panel).
+cards), `neutral` (notices, empty states and the app list on the System tab) and `surface` (the
+settings panel). The System tab's blocks reuse these: disk `mono`, CPU `accent`, memory
+`lavender`, battery `sky`, network `coral`.
 
 | Key | Default | Range | What it does |
 |---|---|---|---|

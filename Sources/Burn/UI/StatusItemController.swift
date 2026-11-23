@@ -130,13 +130,13 @@ final class StatusItemController: NSObject {
 
     private func render() {
         let entries = model.menuBarEntries
-        let image = MenuBarImage.make(entries: entries)
+        let alert = model.system.alert
+        let image = MenuBarImage.make(entries: entries, alert: alert)
         item.button?.image = image
         // The button takes its new width on the next layout pass.
         DispatchQueue.main.async { [weak self] in self?.realign() }
-        item.button?.setAccessibilityLabel(
-            entries.isEmpty ? "Burn"
-                : entries.map { "\($0.provider.name) \(Format.remaining($0.percent)) left" }.joined(separator: ", "))
+        let labels = entries.map { "\($0.provider.name) \(Format.remaining($0.percent)) left" } + [alert?.description].compactMap { $0 }
+        item.button?.setAccessibilityLabel(labels.isEmpty ? "Burn" : labels.joined(separator: ", "))
     }
 }
 
@@ -171,14 +171,31 @@ enum MenuBarImage {
     private static let height: CGFloat = 18
 
     @MainActor
-    static func make(entries: [AppModel.MenuBarEntry]) -> NSImage {
-        guard !entries.isEmpty else {
+    static func make(entries: [AppModel.MenuBarEntry], alert: SystemAlert? = nil) -> NSImage {
+        guard !entries.isEmpty || alert != nil else {
             let img = NSImage(systemSymbolName: "flame", accessibilityDescription: "Burn") ?? NSImage()
             img.isTemplate = true
             return img
         }
-        struct Part { let icon: CGImage?; let text: String; let level: Level }
-        let parts = entries.map { e -> Part in
+        struct Part {
+            let icon: CGImage?
+            let text: String
+            let level: Level
+            /// Symbols aren't square; logos are.
+            var iconWidth: CGFloat {
+                guard let icon, icon.height > 0 else { return MenuBarImage.iconSize }
+                return MenuBarImage.iconSize * CGFloat(icon.width) / CGFloat(icon.height)
+            }
+        }
+        var parts: [Part] = []
+        if entries.isEmpty {
+            // A warning on its own would leave nothing saying it's Burn.
+            let flame = NSImage(systemSymbolName: "flame", accessibilityDescription: nil)
+            var rect = CGRect(origin: .zero, size: CGSize(width: (flame?.size.width ?? iconSize) * 2,
+                                                          height: (flame?.size.height ?? iconSize) * 2))
+            parts.append(Part(icon: flame?.cgImage(forProposedRect: &rect, context: nil, hints: nil), text: "", level: .normal))
+        }
+        parts += entries.map { e -> Part in
             var text = Format.remaining(e.percent)
             if Level(e.percent) == .full, e.resetsAt != nil { text += " · " + Format.shortReset(e.resetsAt) }
             let icon = ProviderIcon.image(e.provider)
@@ -186,7 +203,18 @@ enum MenuBarImage {
             return Part(icon: icon.cgImage(forProposedRect: &rect, context: nil, hints: nil),
                         text: text, level: Level(e.percent))
         }
-        let widths = parts.map { iconSize + iconGap + ceil(($0.text as NSString).size(withAttributes: [.font: font]).width) }
+        if let alert {
+            let config = NSImage.SymbolConfiguration(pointSize: iconSize - 1, weight: .semibold)
+            let symbol = NSImage(systemSymbolName: alert.symbol, accessibilityDescription: nil)?.withSymbolConfiguration(config)
+            // At twice its own size, so it stays sharp and keeps its proportions.
+            var rect = CGRect(origin: .zero, size: CGSize(width: (symbol?.size.width ?? iconSize) * 2,
+                                                          height: (symbol?.size.height ?? iconSize) * 2))
+            parts.append(Part(icon: symbol?.cgImage(forProposedRect: &rect, context: nil, hints: nil),
+                              text: alert.text, level: alert.level))
+        }
+        let widths = parts.map {
+            $0.text.isEmpty ? $0.iconWidth : $0.iconWidth + iconGap + ceil(($0.text as NSString).size(withAttributes: [.font: font]).width)
+        }
         let total = widths.reduce(0, +) + entryGap * CGFloat(parts.count - 1)
 
         let image = NSImage(size: NSSize(width: total, height: height), flipped: false) { _ in
@@ -197,7 +225,7 @@ enum MenuBarImage {
             for (part, width) in zip(parts, widths) {
                 let color = Theme.menuBar(part.level, dark: dark)
                 if let icon = part.icon {
-                    let r = CGRect(x: x, y: (height - iconSize) / 2, width: iconSize, height: iconSize)
+                    let r = CGRect(x: x, y: (height - iconSize) / 2, width: part.iconWidth, height: iconSize)
                     ctx.saveGState()
                     ctx.clip(to: r, mask: icon)
                     ctx.setFillColor(color.cgColor)
@@ -206,7 +234,7 @@ enum MenuBarImage {
                 }
                 let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
                 let size = (part.text as NSString).size(withAttributes: attrs)
-                (part.text as NSString).draw(at: NSPoint(x: x + iconSize + iconGap, y: (height - size.height) / 2), withAttributes: attrs)
+                (part.text as NSString).draw(at: NSPoint(x: x + part.iconWidth + iconGap, y: (height - size.height) / 2), withAttributes: attrs)
                 x += width + entryGap
             }
             return true
