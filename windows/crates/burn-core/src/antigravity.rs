@@ -48,7 +48,14 @@ fn model_id_name(id: i64) -> Option<&'static str> {
 }
 
 pub fn rate_model(model: &str) -> String {
-    if matches!(model, "gemini-3-flash-agent" | "gemini-3-flash-agent-a" | "gemini-3-flash-agent-b" | "gemini-3-flash-a" | "gemini-3-flash-b") {
+    if matches!(
+        model,
+        "gemini-3-flash-agent"
+            | "gemini-3-flash-agent-a"
+            | "gemini-3-flash-agent-b"
+            | "gemini-3-flash-a"
+            | "gemini-3-flash-b"
+    ) {
         return "gemini-3.5-flash".into();
     }
     if model == "gemini-3.7-flash-safety-le" {
@@ -60,17 +67,8 @@ pub fn rate_model(model: &str) -> String {
     if model == "gemini-pro-orchestrator-g1-pro" {
         return "gemini-4-argon".into();
     }
-    const SUFFIXES: [&str; 9] = [
-        "-extra-low",
-        "-low",
-        "-medium",
-        "-high",
-        "-tiered",
-        "-control",
-        "-thinking",
-        "-agent",
-        "-orchestrator",
-    ];
+    const SUFFIXES: [&str; 9] =
+        ["-extra-low", "-low", "-medium", "-high", "-tiered", "-control", "-thinking", "-agent", "-orchestrator"];
     let mut base = model;
     loop {
         let mut stripped = false;
@@ -85,11 +83,7 @@ pub fn rate_model(model: &str) -> String {
             break;
         }
     }
-    if base == "gemini-3-flash" {
-        "gemini-3-flash-preview".into()
-    } else {
-        base.into()
-    }
+    if base == "gemini-3-flash" { "gemini-3-flash-preview".into() } else { base.into() }
 }
 
 pub fn normalize_model_name(name: &str) -> String {
@@ -126,7 +120,14 @@ pub fn normalize_model_name(name: &str) -> String {
 }
 
 pub fn is_concrete_model(model: &str) -> bool {
-    if matches!(model, "gemini-3-flash-agent" | "gemini-3-flash-agent-a" | "gemini-3-flash-agent-b" | "gemini-3-flash-a" | "gemini-3-flash-b") {
+    if matches!(
+        model,
+        "gemini-3-flash-agent"
+            | "gemini-3-flash-agent-a"
+            | "gemini-3-flash-agent-b"
+            | "gemini-3-flash-a"
+            | "gemini-3-flash-b"
+    ) {
         return false;
     }
     if let Some(rest) = model.strip_prefix("gemini-") {

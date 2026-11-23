@@ -745,8 +745,7 @@ pub fn parse_t3_cache(path: &Path) -> io::Result<Vec<T3CacheFile>> {
     let sorted: BTreeMap<&String, &Value> = files.iter().collect();
     for (src, e) in sorted {
         let Value::Object(entry) = e else { continue };
-        let Some(provider) =
-            str_of(entry.get("p")).filter(|p| *p == "claude" || *p == "codex" || *p == "antigravity")
+        let Some(provider) = str_of(entry.get("p")).filter(|p| *p == "claude" || *p == "codex" || *p == "antigravity")
         else {
             continue;
         };

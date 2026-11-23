@@ -164,8 +164,8 @@ fn decode_hex(s: &str) -> Option<Vec<u8>> {
         _ => None,
     };
     let mut out = Vec::with_capacity(b.len() / 2);
-    for pair in b.chunks_exact(2) {
-        out.push((val(pair[0])? << 4) | val(pair[1])?);
+    for [hi, lo] in b.as_chunks::<2>().0 {
+        out.push((val(*hi)? << 4) | val(*lo)?);
     }
     Some(out)
 }
@@ -269,7 +269,8 @@ fn refresh_oauth_token(
         return Err(LimitsError::Http(status));
     }
     let json = http::parse_json_object(&body)?;
-    let access = json.get("access_token").and_then(Value::as_str).filter(|s| !s.is_empty()).ok_or(LimitsError::BadResponse)?;
+    let access =
+        json.get("access_token").and_then(Value::as_str).filter(|s| !s.is_empty()).ok_or(LimitsError::BadResponse)?;
     let expires_in = json_f64(json.get("expires_in")).filter(|&v| v > 0.0).ok_or(LimitsError::BadResponse)?;
     if let Ok(mut guard) = TOKEN_CACHE.lock() {
         *guard = Some(RefreshedToken {
@@ -367,11 +368,21 @@ pub fn fetch(paths: &Paths) -> Result<ProviderLimits, LimitsError> {
 
     let (summary, sum_unauth, sum_err) = fetch_op("retrieveUserQuotaSummary", &auth, &body, parse_summary);
     if !summary.is_empty() {
-        return Ok(ProviderLimits { provider: ProviderId::Antigravity, plan: None, windows: summary, fetched_at: now_ms() });
+        return Ok(ProviderLimits {
+            provider: ProviderId::Antigravity,
+            plan: None,
+            windows: summary,
+            fetched_at: now_ms(),
+        });
     }
     let (models, mod_unauth, mod_err) = fetch_op("fetchAvailableModels", &auth, &body, |j, _| parse_models(j));
     if !models.is_empty() {
-        return Ok(ProviderLimits { provider: ProviderId::Antigravity, plan: None, windows: models, fetched_at: now_ms() });
+        return Ok(ProviderLimits {
+            provider: ProviderId::Antigravity,
+            plan: None,
+            windows: models,
+            fetched_at: now_ms(),
+        });
     }
     if sum_unauth || mod_unauth {
         return Err(LimitsError::TokenExpired);
@@ -634,7 +645,9 @@ mod tests {
     #[test]
     fn expired_cli_token_keeps_refresh_token() {
         let token = |expiry: &str| {
-            format!(r#"{{"token":{{"access_token":"a","refresh_token":"r","expiry":"{expiry}"}},"auth_method":"consumer"}}"#)
+            format!(
+                r#"{{"token":{{"access_token":"a","refresh_token":"r","expiry":"{expiry}"}},"auth_method":"consumer"}}"#
+            )
         };
         let now = parse_iso_ms("2027-01-15T08:00:00Z").unwrap();
         assert_eq!(
@@ -645,9 +658,6 @@ mod tests {
             parse_cli_token(&token("2027-01-15T07:00:00Z"), now),
             ParsedCliToken::Expired(Some("r".into()), Some(AuthMethod::Personal))
         );
-        assert_eq!(
-            parse_cli_token(r#"{"token":{"access_token":"a"}}"#, now),
-            ParsedCliToken::Expired(None, None)
-        );
+        assert_eq!(parse_cli_token(r#"{"token":{"access_token":"a"}}"#, now), ParsedCliToken::Expired(None, None));
     }
 }
