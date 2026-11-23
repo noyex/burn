@@ -187,7 +187,15 @@ enum MenuBarImage {
                 return MenuBarImage.iconSize * CGFloat(icon.width) / CGFloat(icon.height)
             }
         }
-        var parts = entries.map { e -> Part in
+        var parts: [Part] = []
+        if entries.isEmpty {
+            // A warning on its own would leave nothing saying it's Burn.
+            let flame = NSImage(systemSymbolName: "flame", accessibilityDescription: nil)
+            var rect = CGRect(origin: .zero, size: CGSize(width: (flame?.size.width ?? iconSize) * 2,
+                                                          height: (flame?.size.height ?? iconSize) * 2))
+            parts.append(Part(icon: flame?.cgImage(forProposedRect: &rect, context: nil, hints: nil), text: "", level: .normal))
+        }
+        parts += entries.map { e -> Part in
             var text = Format.remaining(e.percent)
             if Level(e.percent) == .full, e.resetsAt != nil { text += " · " + Format.shortReset(e.resetsAt) }
             let icon = ProviderIcon.image(e.provider)
@@ -204,7 +212,9 @@ enum MenuBarImage {
             parts.append(Part(icon: symbol?.cgImage(forProposedRect: &rect, context: nil, hints: nil),
                               text: alert.text, level: alert.level))
         }
-        let widths = parts.map { $0.iconWidth + iconGap + ceil(($0.text as NSString).size(withAttributes: [.font: font]).width) }
+        let widths = parts.map {
+            $0.text.isEmpty ? $0.iconWidth : $0.iconWidth + iconGap + ceil(($0.text as NSString).size(withAttributes: [.font: font]).width)
+        }
         let total = widths.reduce(0, +) + entryGap * CGFloat(parts.count - 1)
 
         let image = NSImage(size: NSSize(width: total, height: height), flipped: false) { _ in

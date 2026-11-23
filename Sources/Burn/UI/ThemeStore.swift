@@ -155,7 +155,8 @@ final class ThemeStore {
 
         var next = ResolvedTheme.standard
         var problems: [String] = []
-        if let flag = CommandLine.arguments.firstIndex(of: "--theme-file"),
+        if CommandLine.arguments.contains("--preview"),
+           let flag = CommandLine.arguments.firstIndex(of: "--theme-file"),
            let path = CommandLine.arguments.dropFirst(flag + 1).first,
            let loaded = Self.loadFile(URL(fileURLWithPath: path), families: families) {
             // Development aid: a preview window in some theme without touching the user's choice.

@@ -275,7 +275,7 @@ actor SystemSampler {
             if let app = Self.appBundle(forExecutable: path) {
                 key = app
                 bundle = app
-                name = (app as NSString).lastPathComponent.replacingOccurrences(of: ".app", with: "")
+                name = ((app as NSString).lastPathComponent as NSString).deletingPathExtension
             } else {
                 let short = proc_name(pid, &nameBuf, UInt32(nameBuf.count)) > 0
                     ? String(cString: nameBuf) : (path as NSString).lastPathComponent

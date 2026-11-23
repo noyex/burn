@@ -103,6 +103,11 @@ struct PopoverView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // Animated theme patterns stand still while the panel is closed.
         .environment(\.patternsMoving, visible)
+        // Reads every couple of seconds only while the System tab is on screen. Here, not on
+        // `main`, which leaves the tree when Settings opens and would never see that change.
+        .onChange(of: visible && model.settings.tab == .system && !showingSettings, initial: true) { _, live in
+            model.system.setLive(live)
+        }
         .onChange(of: visible) { _, visible in
             // The panel opens on the usage page again, never in settings or the theme picker,
             // and with no half-made shelf selection, like the Windows panel.
@@ -156,10 +161,6 @@ struct PopoverView: View {
         }
         .onChange(of: settings.tab) { _, tab in
             if tab != .usage { model.editingPanel = false }
-        }
-        // Reads every couple of seconds only while the System tab is on screen.
-        .onChange(of: model.popoverVisible && settings.tab == .system && !showingSettings, initial: true) { _, live in
-            model.system.setLive(live)
         }
         .onChange(of: model.editingPanel) { _, editing in
             if !editing { dragging = nil }

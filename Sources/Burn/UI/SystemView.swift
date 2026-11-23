@@ -8,6 +8,7 @@ struct SystemView: View {
     let visible: Bool
 
     @Environment(\.colorScheme) private var scheme
+    @State private var hoveringBattery = false
 
     private var theme: Theme { Theme(scheme) }
     private var snap: SystemSnapshot { monitor.snapshot }
@@ -151,7 +152,8 @@ struct SystemView: View {
         .foregroundStyle(ink)
         .block(CardColor.sky.tokens.fill)
         .environment(\.blockLevel, Double(b.percent) / 100)
-        .hoverTip(batteryTip(b))
+        .hoverTip(batteryTip(b), isShown: hoveringBattery && !batteryTip(b).isEmpty)
+        .onHover { hoveringBattery = $0 }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Battery")
         .accessibilityValue("\(b.percent)%, \(batteryCaption(b))")

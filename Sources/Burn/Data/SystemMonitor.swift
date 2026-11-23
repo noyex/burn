@@ -55,13 +55,15 @@ final class SystemMonitor {
         if next.cpu == nil { next.cpu = snapshot.cpu }
         if next.network == nil { next.network = snapshot.network }
         if next.apps.isEmpty { next.apps = snapshot.apps }
+        if next.disk == nil { next.disk = snapshot.disk }
+        if next.memory == nil { next.memory = snapshot.memory }
         snapshot = next
         lastSample = .now
         if let cpu = snap.cpu {
             cpuHistory.append(cpu)
             if cpuHistory.count > Self.historyLength { cpuHistory.removeFirst(cpuHistory.count - Self.historyLength) }
         }
-        setAlert(SystemAlert(disk: snap.disk, pressure: snap.memory?.pressure ?? .normal))
+        setAlert(SystemAlert(disk: next.disk, pressure: next.memory?.pressure ?? .normal, margin: diskMargin))
     }
 
     // MARK: Menu bar warning
@@ -83,7 +85,13 @@ final class SystemMonitor {
     private func checkAlert() async {
         let reading = await sampler.alertReading()
         guard alertTimer != nil else { return }
-        setAlert(SystemAlert(disk: reading.disk, pressure: reading.pressure))
+        setAlert(SystemAlert(disk: reading.disk ?? snapshot.disk, pressure: reading.pressure, margin: diskMargin))
+    }
+
+    /// Once the disk warning shows, it waits for this much more room before it goes away, so
+    /// free space hovering at the line doesn't make the menu bar flicker.
+    private var diskMargin: Int64 {
+        if case .disk = alert?.kind { 1_000_000_000 } else { 0 }
     }
 
     private func setAlert(_ next: SystemAlert?) {
@@ -102,8 +110,9 @@ struct SystemAlert: Equatable {
     let level: MenuBarImage.Level
 
     /// The more urgent of the two, or nil when both are fine.
-    init?(disk: SystemSnapshot.Disk?, pressure: MemoryPressure) {
-        let diskLevel = disk.map { MenuBarImage.Level(free: $0.free) } ?? .normal
+    /// `margin` is subtracted from free space, to keep a warning that is already showing.
+    init?(disk: SystemSnapshot.Disk?, pressure: MemoryPressure, margin: Int64 = 0) {
+        let diskLevel = disk.map { MenuBarImage.Level(free: $0.free - margin) } ?? .normal
         let memoryLevel = MenuBarImage.Level(pressure)
         if let disk, diskLevel != .normal, diskLevel == .full || memoryLevel != .full {
             self.init(kind: .disk(free: disk.free), level: diskLevel)

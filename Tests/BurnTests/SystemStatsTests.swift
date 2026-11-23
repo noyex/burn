@@ -24,6 +24,9 @@ struct SystemStatsTests {
         #expect(Format.rate(300) == "0 KB/s")
         #expect(Format.minutes(250) == "4h 10m")
         #expect(Format.memory(34_359_738_368) == "32 GB")
+        #expect(Format.bytes(9_960_000_000) == "10 GB")
+        #expect(Format.bytes(999_700_000_000) == "1 TB")
+        #expect(Format.rate(999_999) == "1 MB/s")
     }
 
     @MainActor @Test func alertPicksTheUrgentOne() {
@@ -35,11 +38,16 @@ struct SystemStatsTests {
         #expect(SystemAlert(disk: low, pressure: .critical)?.kind == .memory)
         #expect(SystemAlert(disk: full, pressure: .critical)?.kind == .disk(free: 1_000_000_000))
         #expect(SystemAlert(disk: roomy, pressure: .warning)?.kind == .memory)
+        let edge = SystemSnapshot.Disk(total: 1_000_000_000_000, free: 10_500_000_000)
+        #expect(SystemAlert(disk: edge, pressure: .normal) == nil)
+        #expect(SystemAlert(disk: edge, pressure: .normal, margin: 1_000_000_000)?.level == .warn)
     }
 
     @Test func readsThisMac() async {
         let sampler = SystemSampler()
         _ = await sampler.sample(apps: 4)
+        // CPU ticks advance every ~10 ms; give the second reading something to compare.
+        try? await Task.sleep(for: .milliseconds(200))
         let s = await sampler.sample(apps: 4)
         #expect((s.disk?.total ?? 0) > 0)
         #expect((s.memory?.total ?? 0) > 0)

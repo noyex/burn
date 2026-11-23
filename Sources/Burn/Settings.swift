@@ -76,7 +76,8 @@ final class Settings {
         windows = menuBarWindows
         launchAtLogin = SMAppService.mainApp.status == .enabled
         // `--tab system` opens the preview window on a tab without saving it, for screenshots.
-        let flag = CommandLine.arguments.firstIndex(of: "--tab").flatMap { CommandLine.arguments.dropFirst($0 + 1).first }
+        let args = CommandLine.arguments
+        let flag = args.contains("--preview") ? args.firstIndex(of: "--tab").flatMap { args.dropFirst($0 + 1).first } : nil
         tab = (flag ?? defaults.string(forKey: "popover.tab")).flatMap(PopoverTab.init) ?? .usage
         shelfExpanded = defaults.bool(forKey: "shelf.expanded")
         resourceAlerts = defaults.object(forKey: "menuBar.resourceAlerts") as? Bool ?? true

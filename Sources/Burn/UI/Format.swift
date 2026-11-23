@@ -62,17 +62,19 @@ enum Format {
 
     /// `bytes` split into the number and its unit, for a big number with a small unit.
     static func bytesParts<T: BinaryInteger>(_ v: T, base: Double = 1000) -> (String, String) {
-        let d = Double(v)
-        let (value, unit): (Double, String) = switch d {
-        case pow(base, 4)...: (d / pow(base, 4), "TB")
-        case pow(base, 3)...: (d / pow(base, 3), "GB")
-        case pow(base, 2)...: (d / pow(base, 2), "MB")
-        default: (d / base, "KB")
+        let units = ["KB", "MB", "GB", "TB"]
+        var value = Double(v) / base
+        var i = 0
+        // Rounds before it picks the unit, so 999.7 GB reads "1 TB", not "1000 GB".
+        func shown(_ x: Double) -> Double { x < 9.95 ? (x * 10).rounded() / 10 : x.rounded() }
+        while i < units.count - 1, shown(value) >= base {
+            value /= base
+            i += 1
         }
+        let r = shown(value)
         // One decimal below 10, where it still says something.
-        let text = value < 10 && value.rounded() != value
-            ? String(format: "%.1f", locale: en, value) : String(Int(value.rounded()))
-        return (text, unit)
+        let text = r < 10 && r.rounded() != r ? String(format: "%.1f", locale: en, r) : String(Int(r))
+        return (text, units[i])
     }
 
     /// Memory in binary units, like Activity Monitor: 32 GiB reads "32 GB".
